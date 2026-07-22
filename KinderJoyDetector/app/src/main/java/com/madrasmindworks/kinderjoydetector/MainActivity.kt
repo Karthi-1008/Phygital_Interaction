@@ -34,6 +34,17 @@ class MainActivity : AppCompatActivity() {
     // Frame skip — never pile up work
     @Volatile private var isProcessing = false
 
+    // Reused across frames — camera resolution is fixed, so allocate once
+    private var reusableBitmap: Bitmap? = null
+
+    // Temporal smoothing: hold the last-seen detections briefly when a single
+    // frame comes back empty/borderline. YOLO confidence naturally dips a few
+    // frames in a row even while the toy is in view; this stops the box from
+    // flickering on and off and stops "missed" detections the user notices.
+    private var lastDets: List<YoloDetector.Detection> = emptyList()
+    private var framesSinceLastDet = 0
+    private val HOLD_FRAMES = 4
+
     companion object {
         private const val TAG = "MainActivity"
         private const val REQ_CAMERA = 10
@@ -109,8 +120,20 @@ class MainActivity : AppCompatActivity() {
         val srcW = bmp.width
         val srcH = bmp.height
 
-        val dets = detector.detect(bmp)
-        bmp.recycle()
+        val rawDets = detector.detect(bmp)
+
+        // Temporal smoothing — see field comments above
+        val dets: List<YoloDetector.Detection>
+        if (rawDets.isNotEmpty()) {
+            dets = rawDets
+            lastDets = rawDets
+            framesSinceLastDet = 0
+        } else if (framesSinceLastDet < HOLD_FRAMES) {
+            dets = lastDets
+            framesSinceLastDet++
+        } else {
+            dets = emptyList()
+        }
 
         runOnUiThread {
             binding.overlayView.setDetections(dets, srcW, srcH)
@@ -120,20 +143,29 @@ class MainActivity : AppCompatActivity() {
         isProcessing = false
     }
 
+    /**
+     * Reuses a single ARGB_8888 Bitmap across frames instead of allocating a
+     * new one every frame (camera resolution is fixed after startCamera(), so
+     * there's no reason to ever re-allocate). This is the other big source of
+     * per-frame GC pressure alongside the detector's old scaled/padded Bitmaps.
+     */
     private fun imageProxyToBitmap(img: ImageProxy): Bitmap {
         val plane      = img.planes[0]
         val rowStride  = plane.rowStride
         val pixStride  = plane.pixelStride
         val rowPad     = rowStride - pixStride * img.width
+        val strideW    = img.width + rowPad / pixStride
 
-        val bmp = Bitmap.createBitmap(
-            img.width + rowPad / pixStride,
-            img.height,
-            Bitmap.Config.ARGB_8888
-        )
+        var bmp = reusableBitmap
+        if (bmp == null || bmp.width != strideW || bmp.height != img.height) {
+            bmp?.recycle()
+            bmp = Bitmap.createBitmap(strideW, img.height, Bitmap.Config.ARGB_8888)
+            reusableBitmap = bmp
+        }
         bmp.copyPixelsFromBuffer(plane.buffer)
+
         return if (rowPad == 0) bmp
-        else { val c = Bitmap.createBitmap(bmp, 0, 0, img.width, img.height); bmp.recycle(); c }
+        else Bitmap.createBitmap(bmp, 0, 0, img.width, img.height)  // small crop view, cheap
     }
 
     // ── HUD ───────────────────────────────────────────────────────────────────
@@ -185,5 +217,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         inferenceExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
+        reusableBitmap?.recycle()
     }
 }

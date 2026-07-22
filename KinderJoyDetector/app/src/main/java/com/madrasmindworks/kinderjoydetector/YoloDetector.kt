@@ -61,19 +61,27 @@ class YoloDetector(private val context: Context) {
 
     // Pre-allocated — zero GC per frame
     private val inputBuffer = FloatArray(3 * INPUT_SIZE * INPUT_SIZE)
-    private val pixelBuffer = IntArray(INPUT_SIZE * INPUT_SIZE)
+
+    // Reusable source-pixel buffer, resized only if camera resolution changes
+    private var srcPixels = IntArray(0)
+    private var srcPixelsW = 0
+    private var srcPixelsH = 0
 
     fun load() {
         try {
             ortEnv = OrtEnvironment.getEnvironment()
 
+            val cores = Runtime.getRuntime().availableProcessors().coerceIn(2, 8)
+
             val opts = OrtSession.SessionOptions().apply {
-                setIntraOpNumThreads(4)
-                setInterOpNumThreads(2)
+                setIntraOpNumThreads(cores)
+                setInterOpNumThreads(1)                 // single graph, no parallel branches to gain from >1
                 setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+                setMemoryPatternOptimization(true)
+                setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
                 try {
                     addNnapi()
-                    Log.i(TAG, "NNAPI enabled")
+                    Log.i(TAG, "NNAPI enabled, $cores threads")
                 } catch (e: Exception) {
                     Log.w(TAG, "CPU fallback: ${e.message}")
                 }
@@ -91,40 +99,64 @@ class YoloDetector(private val context: Context) {
     /**
      * Run detection on [bitmap] (any size).
      * Returns detections in original bitmap pixel coordinates.
+     *
+     * No intermediate Bitmap objects are created here — the previous version
+     * allocated a scaled Bitmap + a padded Bitmap + a Canvas every single frame,
+     * which is the single biggest source of GC pauses (and therefore dropped
+     * frames) on low-end phones. This version reads pixels once into a reused
+     * IntArray and resizes+letterboxes directly into the float tensor buffer.
      */
     fun detect(bitmap: Bitmap): List<Detection> {
         if (!isLoaded) return emptyList()
 
-        val origW = bitmap.width.toFloat()
-        val origH = bitmap.height.toFloat()
+        val origW = bitmap.width
+        val origH = bitmap.height
 
-        // 1. Letterbox to 640×640 keeping aspect ratio
-        val scale    = min(INPUT_SIZE / origW, INPUT_SIZE / origH)
-        val newW     = (origW * scale).toInt()
-        val newH     = (origH * scale).toInt()
-        val padLeft  = (INPUT_SIZE - newW) / 2f
-        val padTop   = (INPUT_SIZE - newH) / 2f
+        // Resize source-pixel buffer only when camera resolution actually changes
+        if (srcPixelsW != origW || srcPixelsH != origH) {
+            srcPixels = IntArray(origW * origH)
+            srcPixelsW = origW
+            srcPixelsH = origH
+        }
+        bitmap.getPixels(srcPixels, 0, origW, 0, 0, origW, origH)
 
-        val scaled   = Bitmap.createScaledBitmap(bitmap, newW, newH, true)
-        val padded   = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.RGB_565)
-        val canvas   = android.graphics.Canvas(padded)
-        canvas.drawColor(android.graphics.Color.rgb(114, 114, 114))
-        canvas.drawBitmap(scaled, padLeft, padTop, null)
-        scaled.recycle()
-
-        // 2. Bitmap → normalised planar RGB float (no extra allocations)
-        padded.getPixels(pixelBuffer, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
-        padded.recycle()
+        // 1. Letterbox geometry (kept aspect ratio, matches OverlayView math)
+        val scale    = min(INPUT_SIZE / origW.toFloat(), INPUT_SIZE / origH.toFloat())
+        val newW     = (origW * scale).toInt().coerceAtLeast(1)
+        val newH     = (origH * scale).toInt().coerceAtLeast(1)
+        val padLeft  = (INPUT_SIZE - newW) / 2
+        val padTop   = (INPUT_SIZE - newH) / 2
 
         val rOff = 0
         val gOff = INPUT_SIZE * INPUT_SIZE
         val bOff = 2 * INPUT_SIZE * INPUT_SIZE
-        for (i in pixelBuffer.indices) {
-            val px = pixelBuffer[i]
-            inputBuffer[rOff + i] = ((px shr 16) and 0xFF) * (1f / 255f)
-            inputBuffer[gOff + i] = ((px shr  8) and 0xFF) * (1f / 255f)
-            inputBuffer[bOff + i] = ( px         and 0xFF) * (1f / 255f)
+        val padVal = 114f / 255f
+
+        // 2. Direct nearest-neighbour resize + letterbox straight into the
+        //    normalised planar float tensor — zero extra allocations, zero Bitmaps.
+        for (y in 0 until INPUT_SIZE) {
+            val srcY = y - padTop
+            val rowIsPad = srcY < 0 || srcY >= newH
+            val sy = if (rowIsPad) 0 else (srcY * origH / newH).coerceIn(0, origH - 1)
+            val rowBase = y * INPUT_SIZE
+            for (x in 0 until INPUT_SIZE) {
+                val srcX = x - padLeft
+                if (rowIsPad || srcX < 0 || srcX >= newW) {
+                    inputBuffer[rOff + rowBase + x] = padVal
+                    inputBuffer[gOff + rowBase + x] = padVal
+                    inputBuffer[bOff + rowBase + x] = padVal
+                } else {
+                    val sx = (srcX * origW / newW).coerceIn(0, origW - 1)
+                    val px = srcPixels[sy * origW + sx]
+                    inputBuffer[rOff + rowBase + x] = ((px shr 16) and 0xFF) * (1f / 255f)
+                    inputBuffer[gOff + rowBase + x] = ((px shr  8) and 0xFF) * (1f / 255f)
+                    inputBuffer[bOff + rowBase + x] = ( px         and 0xFF) * (1f / 255f)
+                }
+            }
         }
+
+        val padLeftF = padLeft.toFloat()
+        val padTopF  = padTop.toFloat()
 
         // 3. Inference
         val shape  = longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong())
@@ -156,15 +188,15 @@ class YoloDetector(private val context: Context) {
             val w  = (raw[2] as FloatArray)[a]
             val h  = (raw[3] as FloatArray)[a]
 
-            val x1 = ((cx - w * 0.5f) - padLeft) / scale
-            val y1 = ((cy - h * 0.5f) - padTop)  / scale
-            val x2 = ((cx + w * 0.5f) - padLeft) / scale
-            val y2 = ((cy + h * 0.5f) - padTop)  / scale
+            val x1 = ((cx - w * 0.5f) - padLeftF) / scale
+            val y1 = ((cy - h * 0.5f) - padTopF)  / scale
+            val x2 = ((cx + w * 0.5f) - padLeftF) / scale
+            val y2 = ((cy + h * 0.5f) - padTopF)  / scale
 
             dets.add(Detection(
                 rect       = RectF(
-                    x1.coerceIn(0f, origW), y1.coerceIn(0f, origH),
-                    x2.coerceIn(0f, origW), y2.coerceIn(0f, origH)
+                    x1.coerceIn(0f, origW.toFloat()), y1.coerceIn(0f, origH.toFloat()),
+                    x2.coerceIn(0f, origW.toFloat()), y2.coerceIn(0f, origH.toFloat())
                 ),
                 classIndex = bestCls,
                 className  = CLASS_NAMES[bestCls],
