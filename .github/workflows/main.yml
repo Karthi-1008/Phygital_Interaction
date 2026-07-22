@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: KinderJoyDetector   # ← THIS is the fix
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,17 +23,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.4'
+      - name: Generate Gradle wrapper
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -P /tmp
+          unzip -q /tmp/gradle-8.4-bin.zip -d /opt/gradle
+          /opt/gradle/gradle-8.4/bin/gradle wrapper
 
       - name: Build Release APK
-        run: gradle assembleRelease --stacktrace
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: KinderJoyDetector-APK
-          path: app/build/outputs/apk/release/*.apk
+          path: KinderJoyDetector/app/build/outputs/apk/release/*.apk
           retention-days: 90
