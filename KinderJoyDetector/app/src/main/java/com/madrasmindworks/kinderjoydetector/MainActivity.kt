@@ -3,11 +3,12 @@ package com.madrasmindworks.kinderjoydetector
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.util.Size
 import android.view.View
-import android.widget.TextView
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -23,201 +24,165 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var detector: YoloDetector
-
-    // Dedicated single-thread executor for inference (avoids UI-thread stalls)
     private lateinit var inferenceExecutor: ExecutorService
-    private lateinit var cameraExecutor: ExecutorService
 
-    // FPS tracking
-    private var lastFpsTime = System.currentTimeMillis()
-    private var frameCount = 0
+    // FPS
+    private var lastFpsTime  = System.currentTimeMillis()
+    private var frameCount   = 0
+    private var currentFps   = 0f
 
-    // Throttle: skip frames if previous inference still running
+    // Frame skip — never pile up work
     @Volatile private var isProcessing = false
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val REQUEST_CODE_CAMERA = 10
+        private const val REQ_CAMERA = 10
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Keep screen on while app is open
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Show loading state
         binding.statusText.text = "Loading model…"
-        binding.fpsText.visibility = View.GONE
+        binding.fpsText.visibility = View.INVISIBLE
 
-        // Initialise executors
-        cameraExecutor    = Executors.newSingleThreadExecutor()
         inferenceExecutor = Executors.newSingleThreadExecutor()
 
-        // Load ONNX model off the main thread
         inferenceExecutor.execute {
             detector = YoloDetector(this)
             detector.load()
-
             runOnUiThread {
-                binding.statusText.text = "Point camera at a toy"
-                binding.fpsText.visibility = View.VISIBLE
-
-                // Now request camera
-                if (hasCameraPermission()) startCamera()
-                else requestCameraPermission()
+                if (detector.isLoaded) {
+                    binding.statusText.text = "Point camera at a toy"
+                    binding.fpsText.visibility = View.VISIBLE
+                } else {
+                    binding.statusText.text = "Model failed to load"
+                    binding.statusText.setTextColor(Color.RED)
+                }
+                if (hasCameraPermission()) startCamera() else requestCameraPermission()
             }
         }
     }
 
-    // ─── Camera Setup ─────────────────────────────────────────────────────────
+    // ── Camera ────────────────────────────────────────────────────────────────
 
     private fun startCamera() {
-        val providerFuture = ProcessCameraProvider.getInstance(this)
-        providerFuture.addListener({
-            val cameraProvider = providerFuture.get()
+        val future = ProcessCameraProvider.getInstance(this)
+        future.addListener({
+            val provider = future.get()
 
-            // Preview use-case — renders to PreviewView
             val preview = Preview.Builder()
-                .setTargetResolution(Size(640, 480))
+                .setTargetResolution(Size(480, 640))   // portrait — smaller = faster
                 .build()
                 .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
 
-            // Analysis use-case — delivers frames for inference
-            val imageAnalysis = ImageAnalysis.Builder()
-                .setTargetResolution(Size(640, 480))
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            val analysis = ImageAnalysis.Builder()
+                .setTargetResolution(Size(480, 640))
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)  // always freshest frame
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
-                .also { analysis ->
-                    analysis.setAnalyzer(inferenceExecutor) { imageProxy ->
-                        processFrame(imageProxy)
-                    }
-                }
+                .also { it.setAnalyzer(inferenceExecutor, ::processFrame) }
 
             try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    imageAnalysis
-                )
+                provider.unbindAll()
+                provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
             } catch (e: Exception) {
                 Log.e(TAG, "Camera bind failed", e)
             }
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // ─── Frame Processing ─────────────────────────────────────────────────────
+    // ── Frame processing ──────────────────────────────────────────────────────
 
-    private fun processFrame(imageProxy: ImageProxy) {
-        // Skip if last inference still running (keeps UI smooth on slow devices)
-        if (isProcessing) {
-            imageProxy.close()
-            return
-        }
+    private fun processFrame(image: ImageProxy) {
+        if (isProcessing) { image.close(); return }
         isProcessing = true
 
-        try {
-            val bitmap = imageProxyToBitmap(imageProxy)
-            imageProxy.close()   // Release immediately — camera can reuse buffer
+        val bmp = imageProxyToBitmap(image)
+        image.close()    // release camera buffer immediately
 
-            val detections = detector.detect(bitmap)
-            bitmap.recycle()
+        val srcW = bmp.width
+        val srcH = bmp.height
 
-            // Update overlay on UI thread
-            runOnUiThread {
-                binding.overlayView.setDetections(
-                    detections,
-                    imageProxy.width,
-                    imageProxy.height
-                )
-                updateStatus(detections)
-                updateFps()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Frame processing error", e)
-            imageProxy.close()
-        } finally {
-            isProcessing = false
+        val dets = detector.detect(bmp)
+        bmp.recycle()
+
+        runOnUiThread {
+            binding.overlayView.setDetections(dets, srcW, srcH)
+            updateHud(dets)
         }
+
+        isProcessing = false
     }
 
-    private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
-        // RGBA_8888 format — single plane
-        val plane = image.planes[0]
-        val buffer = plane.buffer
-        val pixelStride  = plane.pixelStride
-        val rowStride    = plane.rowStride
-        val rowPadding   = rowStride - pixelStride * image.width
+    private fun imageProxyToBitmap(img: ImageProxy): Bitmap {
+        val plane      = img.planes[0]
+        val rowStride  = plane.rowStride
+        val pixStride  = plane.pixelStride
+        val rowPad     = rowStride - pixStride * img.width
 
         val bmp = Bitmap.createBitmap(
-            image.width + rowPadding / pixelStride,
-            image.height,
+            img.width + rowPad / pixStride,
+            img.height,
             Bitmap.Config.ARGB_8888
         )
-        bmp.copyPixelsFromBuffer(buffer)
-
-        // Crop to exact size if padding was added
-        return if (rowPadding == 0) bmp
-        else Bitmap.createBitmap(bmp, 0, 0, image.width, image.height)
+        bmp.copyPixelsFromBuffer(plane.buffer)
+        return if (rowPad == 0) bmp
+        else { val c = Bitmap.createBitmap(bmp, 0, 0, img.width, img.height); bmp.recycle(); c }
     }
 
-    // ─── UI helpers ──────────────────────────────────────────────────────────
+    // ── HUD ───────────────────────────────────────────────────────────────────
 
-    private fun updateStatus(detections: List<YoloDetector.Detection>) {
+    private fun updateHud(dets: List<YoloDetector.Detection>) {
+        // Detection label
         binding.statusText.text = when {
-            detections.isEmpty() -> "No toy detected"
-            detections.size == 1 -> detections[0].className
-            else -> detections.joinToString(" · ") { it.className }
+            dets.isEmpty()  -> "No toy detected"
+            dets.size == 1  -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}%"
+            else            -> dets.joinToString(" · ") { it.className }
         }
-    }
+        binding.statusText.setTextColor(if (dets.isEmpty()) Color.GRAY else Color.WHITE)
 
-    private fun updateFps() {
+        // FPS counter
         frameCount++
-        val now = System.currentTimeMillis()
+        val now     = System.currentTimeMillis()
         val elapsed = now - lastFpsTime
-        if (elapsed >= 1000) {
-            val fps = frameCount * 1000f / elapsed
-            binding.fpsText.text = "%.0f FPS".format(fps)
-            frameCount = 0
+        if (elapsed >= 800) {
+            currentFps  = frameCount * 1000f / elapsed
+            binding.fpsText.text = "%.0f FPS".format(currentFps)
+            binding.fpsText.setTextColor(when {
+                currentFps >= 20 -> Color.parseColor("#00FF88")
+                currentFps >= 12 -> Color.YELLOW
+                else             -> Color.RED
+            })
+            frameCount  = 0
             lastFpsTime = now
         }
     }
 
-    // ─── Permission handling ──────────────────────────────────────────────────
+    // ── Permissions ───────────────────────────────────────────────────────────
 
     private fun hasCameraPermission() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
                 PackageManager.PERMISSION_GRANTED
 
-    private fun requestCameraPermission() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.CAMERA),
-            REQUEST_CODE_CAMERA
-        )
-    }
+    private fun requestCameraPermission() =
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), REQ_CAMERA)
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CODE_CAMERA) {
-            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-                startCamera()
-            } else {
-                Toast.makeText(this, "Camera permission required", Toast.LENGTH_LONG).show()
-                binding.statusText.text = "Camera permission denied"
-            }
+    override fun onRequestPermissionsResult(req: Int, perms: Array<String>, results: IntArray) {
+        super.onRequestPermissionsResult(req, perms, results)
+        if (req == REQ_CAMERA) {
+            if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) startCamera()
+            else Toast.makeText(this, "Camera permission needed", Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        cameraExecutor.shutdown()
         inferenceExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
     }

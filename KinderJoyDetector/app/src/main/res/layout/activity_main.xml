@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Full-screen camera preview -->
+    <!-- Camera preview — fitCenter so FULL frame is visible, no cropping -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="0dp"
@@ -15,9 +15,9 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:scaleType="fillCenter" />
+        app:scaleType="fitCenter" />
 
-    <!-- Transparent bounding-box overlay (same size as preview) -->
+    <!-- Overlay exactly covers preview — same fitCenter math in OverlayView.kt -->
     <com.madrasmindworks.kinderjoydetector.OverlayView
         android:id="@+id/overlayView"
         android:layout_width="0dp"
@@ -27,20 +27,19 @@
         app:layout_constraintStart_toStartOf="@id/previewView"
         app:layout_constraintEnd_toEndOf="@id/previewView" />
 
-    <!-- Top HUD bar -->
+    <!-- Top HUD -->
     <LinearLayout
         android:id="@+id/hudBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:background="#99000000"
-        android:paddingVertical="8dp"
+        android:background="#BB000000"
+        android:paddingVertical="10dp"
         android:paddingHorizontal="16dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- App name pill -->
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -48,47 +47,42 @@
             android:text="🎯 Kinder Joy Detector"
             android:textColor="#FFFFFF"
             android:textSize="15sp"
-            android:textStyle="bold"
-            android:gravity="center_vertical" />
+            android:textStyle="bold" />
 
-        <!-- FPS counter -->
         <TextView
             android:id="@+id/fpsText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="-- FPS"
             android:textColor="#00FF88"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textStyle="bold"
-            android:fontFamily="monospace"
-            android:gravity="center_vertical" />
+            android:fontFamily="monospace" />
 
     </LinearLayout>
 
-    <!-- Bottom status bar -->
+    <!-- Bottom detection label -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="#CC000000"
-        android:paddingVertical="12dp"
+        android:paddingVertical="14dp"
         android:paddingHorizontal="20dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Detected class name -->
         <TextView
             android:id="@+id/statusText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Initialising…"
             android:textColor="#FFFFFF"
-            android:textSize="20sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:layout_gravity="center_horizontal" />
 
-        <!-- Legend row -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -96,37 +90,18 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="6dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⚡ Flash"
-                android:textColor="#E74C3C"
-                android:textSize="12sp"
-                android:paddingHorizontal="6dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🦇 Batman"
-                android:textColor="#8888CC"
-                android:textSize="12sp"
-                android:paddingHorizontal="6dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⚡ Harry"
-                android:textColor="#FF6B35"
-                android:textSize="12sp"
-                android:paddingHorizontal="6dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🪄 Hermione"
-                android:textColor="#9B59B6"
-                android:textSize="12sp"
-                android:paddingHorizontal="6dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="⚡ Flash" android:textColor="#E74C3C"
+                android:textSize="11sp" android:paddingHorizontal="6dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🦇 Batman" android:textColor="#8888CC"
+                android:textSize="11sp" android:paddingHorizontal="6dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🧙 Harry" android:textColor="#FF6B35"
+                android:textSize="11sp" android:paddingHorizontal="6dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🪄 Hermione" android:textColor="#9B59B6"
+                android:textSize="11sp" android:paddingHorizontal="6dp" />
 
         </LinearLayout>
     </LinearLayout>
