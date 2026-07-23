@@ -30,6 +30,11 @@ class MainActivity : AppCompatActivity() {
 
     private var modelViewer: ModelViewer? = null
 
+    // Preloaded once at startup so the celebration screen never waits on
+    // disk I/O — asset reads (~1-2MB each) happen in the background while
+    // the user is still scanning, not at the exciting moment.
+    private val glbBytesCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
+
     // Frame skip — never pile up work
     @Volatile private var isProcessing = false
 
@@ -96,6 +101,34 @@ class MainActivity : AppCompatActivity() {
                 if (hasCameraPermission()) startCamera() else requestCameraPermission()
             }
         }
+
+        preloadCelebrationAssets()
+    }
+
+    /**
+     * Reads every .glb into memory and warms up the Filament engine (which
+     * compiles its ubershader materials on first use) in the background,
+     * well before the user ever completes a detection — so the celebration
+     * screen has nothing left to do but call loadGlb() on already-loaded
+     * bytes, instead of hitting disk + shader compilation right when it
+     * needs to feel instant.
+     */
+    private fun preloadCelebrationAssets() {
+        Thread({
+            for (toy in TOY_ASSETS.values) {
+                try {
+                    glbBytesCache[toy.assetPath] = assets.open(toy.assetPath).readBytes()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Preload failed for ${toy.assetPath}", e)
+                }
+            }
+            runOnUiThread {
+                // Created on the UI thread (SurfaceHolder callbacks require it),
+                // but all the expensive one-time setup (shader/material
+                // compilation) happens now instead of at celebration time.
+                modelViewer = ModelViewer(binding.modelSurface)
+            }
+        }, "GlbPreload").start()
     }
 
     // ── Camera ────────────────────────────────────────────────────────────────
@@ -282,7 +315,8 @@ class MainActivity : AppCompatActivity() {
         }
         if (toy != null) {
             try {
-                val bytes = assets.open(toy.assetPath).readBytes()
+                val bytes = glbBytesCache[toy.assetPath] ?: assets.open(toy.assetPath).readBytes()
+                    .also { glbBytesCache[toy.assetPath] = it }   // fallback if preload hadn't finished yet
                 viewer.loadGlb(java.nio.ByteBuffer.wrap(bytes))
                 viewer.playAnimation(toy.animationIndex, loop = toy.animationIndex == null) {
                     // Animation finished once — loop it gently so the screen

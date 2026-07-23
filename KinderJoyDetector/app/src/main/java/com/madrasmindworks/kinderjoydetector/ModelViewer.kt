@@ -50,6 +50,23 @@ class ModelViewer(private val surfaceView: SurfaceView) : SurfaceHolder.Callback
 
     companion object {
         private const val TAG = "ModelViewer"
+
+        @Volatile private var nativeLibLoaded = false
+
+        /**
+         * Filament requires this exact call once per process before ANY
+         * Engine/Scene/etc. is touched — it's what actually calls
+         * System.loadLibrary("filament-jni") under the hood. Skipping it is
+         * why Engine.create() was throwing UnsatisfiedLinkError on every
+         * device (nCreateBuilder native method never got linked) rather than
+         * only failing on some architectures.
+         */
+        @Synchronized
+        fun ensureNativeLibLoaded() {
+            if (nativeLibLoaded) return
+            com.google.android.filament.Filament.init()
+            nativeLibLoaded = true
+        }
     }
 
     /** False if Filament failed to initialize on this device — callers should skip 3D and fall back. */
@@ -80,6 +97,8 @@ class ModelViewer(private val surfaceView: SurfaceView) : SurfaceHolder.Callback
 
     init {
         try {
+            ensureNativeLibLoaded()
+
             val eng = Engine.create()
             val scn = eng.createScene()
             val camEntity = EntityManager.get().create()
