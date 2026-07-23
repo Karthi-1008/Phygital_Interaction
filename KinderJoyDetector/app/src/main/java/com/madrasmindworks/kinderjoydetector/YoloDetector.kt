@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.util.Log
+import ai.onnxruntime.TensorInfo
 import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.min
@@ -30,7 +31,16 @@ class YoloDetector(private val context: Context) {
     companion object {
         private const val TAG = "YoloDetector"
         private const val MODEL_FILE = "exp-3.onnx"
-        const val INPUT_SIZE = 640
+
+        // Preferred input size when the model graph allows a dynamic input
+        // shape (smaller tensor = less resize work + fewer FLOPs = faster on
+        // low-end phones). exp-3.onnx is currently exported with a FIXED
+        // 640x640 input, so this only takes effect if/when the model is
+        // re-exported with dynamic H/W axes — detectInputSize() below reads
+        // the graph's actual shape at load time and falls back to 640
+        // automatically, so this is always safe to leave enabled.
+        private const val PREFERRED_DYNAMIC_INPUT_SIZE = 320
+        private const val FALLBACK_INPUT_SIZE = 640
 
         // Model class order from metadata
         val CLASS_NAMES = arrayOf("Harry Potter", "Hermione Granger", "Batman", "Flash")
@@ -59,8 +69,13 @@ class YoloDetector(private val context: Context) {
     var isLoaded = false
         private set
 
-    // Pre-allocated — zero GC per frame
-    private val inputBuffer = FloatArray(3 * INPUT_SIZE * INPUT_SIZE)
+    // Resolved once at load() from the model's own graph metadata — see
+    // detectInputSize(). Not a compile-time constant any more.
+    var inputSize = FALLBACK_INPUT_SIZE
+        private set
+
+    // Pre-allocated — zero GC per frame. Sized once inputSize is known.
+    private lateinit var inputBuffer: FloatArray
 
     // Reusable source-pixel buffer, resized only if camera resolution changes
     private var srcPixels = IntArray(0)
@@ -89,28 +104,75 @@ class YoloDetector(private val context: Context) {
 
             val bytes = context.assets.open(MODEL_FILE).readBytes()
             ortSession = ortEnv!!.createSession(bytes, opts)
+
+            inputSize = detectInputSize(ortSession!!)
+            inputBuffer = FloatArray(3 * inputSize * inputSize)
+
             isLoaded = true
-            Log.i(TAG, "Model loaded — ${CLASS_NAMES.size} classes")
+            Log.i(TAG, "Model loaded — ${CLASS_NAMES.size} classes, input=${inputSize}x$inputSize")
         } catch (e: Exception) {
             Log.e(TAG, "Model load failed", e)
         }
     }
 
     /**
-     * Run detection on [bitmap] (any size).
-     * Returns detections in original bitmap pixel coordinates.
-     *
-     * No intermediate Bitmap objects are created here — the previous version
-     * allocated a scaled Bitmap + a padded Bitmap + a Canvas every single frame,
-     * which is the single biggest source of GC pauses (and therefore dropped
-     * frames) on low-end phones. This version reads pixels once into a reused
-     * IntArray and resizes+letterboxes directly into the float tensor buffer.
+     * Reads the model's actual input tensor shape (NCHW) to decide what
+     * square size we should resize/letterbox into. If the graph declares a
+     * concrete H/W (the normal case for exp-3.onnx, fixed at 640) we must use
+     * exactly that value. If the graph instead declares a dynamic axis (-1),
+     * we're free to pick a smaller size for speed.
      */
-    fun detect(bitmap: Bitmap): List<Detection> {
+    private fun detectInputSize(session: OrtSession): Int {
+        return try {
+            val inputInfo = session.inputInfo.values.first().info as TensorInfo
+            val shape = inputInfo.shape   // [N, C, H, W]
+            val h = if (shape.size >= 3) shape[2] else -1L
+            when {
+                h > 0 -> h.toInt()                       // fixed shape — must match exactly
+                else  -> PREFERRED_DYNAMIC_INPUT_SIZE    // dynamic — pick the fast option
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read input shape, defaulting to $FALLBACK_INPUT_SIZE", e)
+            FALLBACK_INPUT_SIZE
+        }
+    }
+
+    /**
+     * Run detection on the region of [bitmap] inside [cropRect] (full bitmap
+     * if null). Returned detections are in ORIGINAL [bitmap] pixel coordinates
+     * (the crop offset is already added back in), so callers never have to
+     * think about the crop again.
+     *
+     * Cropping to the on-screen guide box before inference means the model
+     * only ever has to reason about the region the user is actually pointing
+     * at — less background clutter for it to reject, and less source-pixel
+     * area to read per frame.
+     */
+    fun detect(bitmap: Bitmap, cropRect: android.graphics.Rect? = null): List<Detection> {
         if (!isLoaded) return emptyList()
 
+        val cropLeft: Int
+        val cropTop: Int
+        val srcBitmap: Bitmap
+        if (cropRect != null) {
+            cropLeft = cropRect.left
+            cropTop = cropRect.top
+            // Cheap: createBitmap(Bitmap, l, t, w, h) shares the same pixel
+            // buffer when no rotation/matrix is applied — no pixel copy here.
+            srcBitmap = Bitmap.createBitmap(bitmap, cropRect.left, cropRect.top, cropRect.width(), cropRect.height())
+        } else {
+            cropLeft = 0
+            cropTop = 0
+            srcBitmap = bitmap
+        }
+
+        return runInference(srcBitmap, cropLeft, cropTop)
+    }
+
+    private fun runInference(bitmap: Bitmap, cropLeft: Int, cropTop: Int): List<Detection> {
         val origW = bitmap.width
         val origH = bitmap.height
+        val INPUT_SIZE = inputSize
 
         // Resize source-pixel buffer only when camera resolution actually changes
         if (srcPixelsW != origW || srcPixelsH != origH) {
@@ -164,11 +226,16 @@ class YoloDetector(private val context: Context) {
         val result = ortSession!!.run(mapOf("images" to tensor))
         tensor.close()
 
-        // 4. Parse [1, 8, 8400]  →  each anchor: [cx,cy,w,h, s0,s1,s2,s3]
+        // 4. Parse [1, 4+numClass, numAnchors] → each anchor: [cx,cy,w,h, s0..sN]
+        //    numAnchors is read from the actual output tensor rather than a
+        //    hardcoded 8400, so this keeps working if inputSize ever changes
+        //    (anchor count scales with input resolution: 640→8400, 320→2100).
         val raw       = (result[0].value as Array<*>)[0] as Array<*>
-        val numAnch   = 8400
         val numClass  = CLASS_NAMES.size
+        val numAnch   = (raw[4] as FloatArray).size
         val dets      = mutableListOf<Detection>()
+        val cropLeftF = cropLeft.toFloat()
+        val cropTopF  = cropTop.toFloat()
 
         for (a in 0 until numAnch) {
             // Best class score
@@ -195,8 +262,8 @@ class YoloDetector(private val context: Context) {
 
             dets.add(Detection(
                 rect       = RectF(
-                    x1.coerceIn(0f, origW.toFloat()), y1.coerceIn(0f, origH.toFloat()),
-                    x2.coerceIn(0f, origW.toFloat()), y2.coerceIn(0f, origH.toFloat())
+                    x1.coerceIn(0f, origW.toFloat()) + cropLeftF, y1.coerceIn(0f, origH.toFloat()) + cropTopF,
+                    x2.coerceIn(0f, origW.toFloat()) + cropLeftF, y2.coerceIn(0f, origH.toFloat()) + cropTopF
                 ),
                 classIndex = bestCls,
                 className  = CLASS_NAMES[bestCls],

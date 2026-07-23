@@ -46,9 +46,11 @@ android {
         viewBinding true
     }
 
-    // Package ONNX model from assets
+    // Package ONNX model + glb models uncompressed (avoids re-compression /
+    // mmap issues for large binary assets)
     aaptOptions {
         noCompress "onnx"
+        noCompress "glb"
     }
 
     // ABI splits for smaller APK sizes per architecture
@@ -83,4 +85,12 @@ dependencies {
     // Lifecycle
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
     implementation 'androidx.activity:activity-ktx:1.8.2'
+
+    // Filament — bundled locally in the APK (no CDN/network dependency at
+    // runtime) for offline .glb loading + rendering of the celebration model.
+    // gltfio-android brings AssetLoader/ResourceLoader/Animator for glTF/.glb.
+    def filament_version = "1.51.5"
+    implementation "com.google.android.filament:filament-android:${filament_version}"
+    implementation "com.google.android.filament:gltfio-android:${filament_version}"
+    implementation "com.google.android.filament:filament-utils-android:${filament_version}"
 }

@@ -17,7 +17,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:scaleType="fitCenter" />
 
-    <!-- Overlay exactly covers preview — same fitCenter math in OverlayView.kt -->
+    <!-- Overlay: guide box + progress ring only (see OverlayView.kt) -->
     <com.madrasmindworks.kinderjoydetector.OverlayView
         android:id="@+id/overlayView"
         android:layout_width="0dp"
@@ -27,83 +27,85 @@
         app:layout_constraintStart_toStartOf="@id/previewView"
         app:layout_constraintEnd_toEndOf="@id/previewView" />
 
-    <!-- Top HUD -->
-    <LinearLayout
-        android:id="@+id/hudBar"
+    <!-- Minimal top title -->
+    <TextView
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:background="#BB000000"
         android:paddingVertical="10dp"
         android:paddingHorizontal="16dp"
+        android:text="🎯 Kinder Joy Detector"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent" />
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🎯 Kinder Joy Detector"
-            android:textColor="#FFFFFF"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/fpsText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="-- FPS"
-            android:textColor="#00FF88"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:fontFamily="monospace" />
-
-    </LinearLayout>
-
-    <!-- Bottom detection label -->
-    <LinearLayout
+    <!-- Single status line — what to do / what's being held in the box -->
+    <TextView
+        android:id="@+id/statusText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:background="#CC000000"
         android:paddingVertical="14dp"
         android:paddingHorizontal="20dp"
+        android:text="Loading model…"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center_horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ══════════════════ Celebration screen (shown on success) ══════════════════
+         Fully replaces the camera UI while the .glb animation plays — camera +
+         inference are unbound/stopped for this whole screen, per requirement
+         that no background scanning runs while the celebration plays. -->
+    <LinearLayout
+        android:id="@+id/celebrationContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:background="#0F0A1F"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
-            android:id="@+id/statusText"
-            android:layout_width="wrap_content"
+            android:id="@+id/celebrationTitle"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Initialising…"
+            android:paddingTop="28dp"
+            android:paddingBottom="8dp"
+            android:paddingHorizontal="16dp"
+            android:text="🎉 Found it!"
+            android:textAlignment="center"
             android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:layout_gravity="center_horizontal" />
+            android:textSize="26sp"
+            android:textStyle="bold" />
 
-        <LinearLayout
-            android:layout_width="wrap_content"
+        <!-- The .glb model renders into this surface, auto-fit to a unit cube
+             by ModelViewer.kt so it looks consistent on any screen size. -->
+        <SurfaceView
+            android:id="@+id/modelSurface"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="8dp" />
+
+        <Button
+            android:id="@+id/btnScanAgain"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="6dp">
+            android:layout_margin="20dp"
+            android:text="Scan Again"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="⚡ Flash" android:textColor="#E74C3C"
-                android:textSize="11sp" android:paddingHorizontal="6dp" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="🦇 Batman" android:textColor="#8888CC"
-                android:textSize="11sp" android:paddingHorizontal="6dp" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="🧙 Harry" android:textColor="#FF6B35"
-                android:textSize="11sp" android:paddingHorizontal="6dp" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="🪄 Hermione" android:textColor="#9B59B6"
-                android:textSize="11sp" android:paddingHorizontal="6dp" />
-
-        </LinearLayout>
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
