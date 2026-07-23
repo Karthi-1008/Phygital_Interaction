@@ -18,6 +18,13 @@ android {
 
         // Enable multi-dex for older devices
         multiDexEnabled true
+
+        // Package native libs for every architecture Filament/ONNX Runtime
+        // ship prebuilt binaries for, so the app runs on any real device AND
+        // any emulator (x86/x86_64 included) rather than just arm64 phones.
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
     }
 
     buildTypes {
@@ -58,8 +65,17 @@ android {
         abi {
             enable false  // Set true to generate per-ABI APKs; false for universal APK
             reset()
-            include "arm64-v8a", "armeabi-v7a", "x86_64"
+            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
             universalApk true
+        }
+    }
+
+    // Filament + ONNX Runtime + their transitive deps can both ship a copy of
+    // some common native libs — pick the first one found instead of failing
+    // the build/install on a duplicate.
+    packagingOptions {
+        jniLibs {
+            pickFirsts += ["**/libc++_shared.so"]
         }
     }
 }

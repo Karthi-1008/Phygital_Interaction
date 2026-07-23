@@ -251,6 +251,16 @@ class MainActivity : AppCompatActivity() {
     // ── Success → celebration ────────────────────────────────────────────────
 
     private fun onDetectionComplete(det: YoloDetector.Detection) {
+        try {
+            onDetectionCompleteInternal(det)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Celebration screen failed — showing fallback text only", t)
+            binding.celebrationContainer.visibility = View.VISIBLE
+            binding.celebrationTitle.text = "🎉 ${det.className} found!"
+        }
+    }
+
+    private fun onDetectionCompleteInternal(det: YoloDetector.Detection) {
         stopCamera()   // no background camera/inference work while celebrating
 
         binding.previewView.visibility = View.GONE
@@ -262,6 +272,14 @@ class MainActivity : AppCompatActivity() {
         binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!"
 
         val viewer = modelViewer ?: ModelViewer(binding.modelSurface).also { modelViewer = it }
+        if (!viewer.isAvailable) {
+            // 3D isn't available on this device (e.g. no OpenGL ES 3 support,
+            // or a native lib mismatch) — fail soft: keep the celebration
+            // text/emoji and "Scan Again" working instead of crashing.
+            Log.w(TAG, "ModelViewer unavailable: ${viewer.lastError}")
+            binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!\n(3D preview unavailable on this device)"
+            return
+        }
         if (toy != null) {
             try {
                 val bytes = assets.open(toy.assetPath).readBytes()
