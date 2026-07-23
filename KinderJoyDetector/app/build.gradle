@@ -89,7 +89,7 @@ dependencies {
     // Filament — bundled locally in the APK (no CDN/network dependency at
     // runtime) for offline .glb loading + rendering of the celebration model.
     // gltfio-android brings AssetLoader/ResourceLoader/Animator for glTF/.glb.
-    def filament_version = "1.51.5"
+    def filament_version = "1.71.4"
     implementation "com.google.android.filament:filament-android:${filament_version}"
     implementation "com.google.android.filament:gltfio-android:${filament_version}"
     implementation "com.google.android.filament:filament-utils-android:${filament_version}"
