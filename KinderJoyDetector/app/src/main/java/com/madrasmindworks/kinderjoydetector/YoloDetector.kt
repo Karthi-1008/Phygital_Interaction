@@ -81,6 +81,7 @@ class YoloDetector(private val context: Context) {
     private var srcPixels = IntArray(0)
     private var srcPixelsW = 0
     private var srcPixelsH = 0
+    private var frameCounter = 0
 
     fun load() {
         try {
@@ -94,11 +95,31 @@ class YoloDetector(private val context: Context) {
                 setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
                 setMemoryPatternOptimization(true)
                 setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
+
+                // XNNPACK first: for a small conv-only YOLO graph like this, a
+                // fully-CPU XNNPACK EP is consistently faster and more
+                // predictable than NNAPI. NNAPI only helps when the WHOLE
+                // graph maps onto vendor NPU/DSP/GPU ops — this model's opset
+                // (20) has ops NNAPI's delegate can't cover, so it silently
+                // partitions the graph between NNAPI and CPU and pays a
+                // device<->CPU tensor-copy tax at every boundary EVERY frame.
+                // That per-frame copy overhead — not thread count — is why
+                // "NNAPI enabled" still showed up slow in the field.
+                var accelerated = false
                 try {
-                    addNnapi()
-                    Log.i(TAG, "NNAPI enabled, $cores threads")
+                    addXnnpack(mapOf("intra_op_num_threads" to cores.toString()))
+                    Log.i(TAG, "XNNPACK enabled, $cores threads")
+                    accelerated = true
                 } catch (e: Exception) {
-                    Log.w(TAG, "CPU fallback: ${e.message}")
+                    Log.w(TAG, "XNNPACK unavailable in this ORT build: ${e.message}")
+                }
+                if (!accelerated) {
+                    try {
+                        addNnapi()
+                        Log.i(TAG, "NNAPI enabled (XNNPACK unavailable), $cores threads")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "CPU fallback: ${e.message}")
+                    }
                 }
             }
 
@@ -110,6 +131,19 @@ class YoloDetector(private val context: Context) {
 
             isLoaded = true
             Log.i(TAG, "Model loaded — ${CLASS_NAMES.size} classes, input=${inputSize}x$inputSize")
+            if (inputSize > PREFERRED_DYNAMIC_INPUT_SIZE) {
+                // This is the real speed ceiling: exp-3.onnx's graph.input is
+                // hard-coded [1,3,640,640] (confirmed via onnx.load()), so no
+                // amount of thread/EP tuning here can make inference do 320x320
+                // worth of work — it will always do the full 640x640 FLOPs.
+                // Real fix is re-exporting the model, e.g. from Ultralytics:
+                //   yolo export model=best.pt format=onnx imgsz=320 dynamic=False opset=17
+                // (dynamic=True also works and lets this class pick 320
+                // automatically via PREFERRED_DYNAMIC_INPUT_SIZE above).
+                Log.w(TAG, "exp-3.onnx has a FIXED ${inputSize}x$inputSize input — " +
+                        "re-export at imgsz=$PREFERRED_DYNAMIC_INPUT_SIZE for the real speedup; " +
+                        "no on-device setting can shrink a fixed graph input.")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Model load failed", e)
         }
@@ -223,8 +257,13 @@ class YoloDetector(private val context: Context) {
         // 3. Inference
         val shape  = longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong())
         val tensor = OnnxTensor.createTensor(ortEnv, FloatBuffer.wrap(inputBuffer), shape)
+        val t0 = System.nanoTime()
         val result = ortSession!!.run(mapOf("images" to tensor))
+        val inferMs = (System.nanoTime() - t0) / 1_000_000f
         tensor.close()
+        // Throttled so it doesn't spam logcat — one line per ~15 frames is
+        // enough to watch the trend while testing an EP/model change.
+        if (++frameCounter % 15 == 0) Log.d(TAG, "inference: ${"%.1f".format(inferMs)}ms")
 
         // 4. Parse [1, 4+numClass, numAnchors] → each anchor: [cx,cy,w,h, s0..sN]
         //    numAnchors is read from the actual output tensor rather than a

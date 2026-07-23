@@ -17,6 +17,7 @@ import com.google.android.filament.Viewport
 import com.google.android.filament.View
 import com.google.android.filament.gltfio.AssetLoader
 import com.google.android.filament.gltfio.FilamentAsset
+import com.google.android.filament.gltfio.Gltfio
 import com.google.android.filament.gltfio.ResourceLoader
 import com.google.android.filament.gltfio.UbershaderProvider
 import java.nio.ByteBuffer
@@ -54,17 +55,26 @@ class ModelViewer(private val surfaceView: SurfaceView) : SurfaceHolder.Callback
         @Volatile private var nativeLibLoaded = false
 
         /**
-         * Filament requires this exact call once per process before ANY
-         * Engine/Scene/etc. is touched — it's what actually calls
-         * System.loadLibrary("filament-jni") under the hood. Skipping it is
-         * why Engine.create() was throwing UnsatisfiedLinkError on every
-         * device (nCreateBuilder native method never got linked) rather than
-         * only failing on some architectures.
+         * Filament ships TWO separate native libraries that each need their
+         * own explicit init call — this was the actual cause of "ModelViewer
+         * unavailable: No implementation found for ...UbershaderProvider
+         * .nCreateUbershaderProvider" on every device, not just some:
+         *
+         *  • Filament.init()  -> loads libfilament-jni.so   (Engine/Scene/View/Renderer/...)
+         *  • Gltfio.init()    -> loads libgltfio-jni.so      (AssetLoader/ResourceLoader/
+         *                                                     UbershaderProvider/Animator)
+         *
+         * Calling only Filament.init() lets Engine.create() etc. work fine,
+         * but any gltfio class (UbershaderProvider, AssetLoader, ResourceLoader)
+         * throws UnsatisfiedLinkError the moment it's constructed, because its
+         * native methods were never linked. Both must be called once per
+         * process before ANY Filament or gltfio object is touched.
          */
         @Synchronized
         fun ensureNativeLibLoaded() {
             if (nativeLibLoaded) return
             com.google.android.filament.Filament.init()
+            Gltfio.init()
             nativeLibLoaded = true
         }
     }
