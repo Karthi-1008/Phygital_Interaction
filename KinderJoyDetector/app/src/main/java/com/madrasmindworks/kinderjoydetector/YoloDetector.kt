@@ -77,6 +77,11 @@ class YoloDetector(private val context: Context) {
     // Pre-allocated — zero GC per frame. Sized once inputSize is known.
     private lateinit var inputBuffer: FloatArray
 
+    // Last inference latency, exposed so the UI can show real on-device
+    // numbers directly (no logcat needed to check if a change helped).
+    @Volatile var lastInferenceMs: Float = 0f
+        private set
+
     // Reusable source-pixel buffer, resized only if camera resolution changes
     private var srcPixels = IntArray(0)
     private var srcPixelsW = 0
@@ -184,37 +189,41 @@ class YoloDetector(private val context: Context) {
      */
     fun detect(bitmap: Bitmap, cropRect: android.graphics.Rect? = null): List<Detection> {
         if (!isLoaded) return emptyList()
-
-        val cropLeft: Int
-        val cropTop: Int
-        val srcBitmap: Bitmap
-        if (cropRect != null) {
-            cropLeft = cropRect.left
-            cropTop = cropRect.top
-            // Cheap: createBitmap(Bitmap, l, t, w, h) shares the same pixel
-            // buffer when no rotation/matrix is applied — no pixel copy here.
-            srcBitmap = Bitmap.createBitmap(bitmap, cropRect.left, cropRect.top, cropRect.width(), cropRect.height())
-        } else {
-            cropLeft = 0
-            cropTop = 0
-            srcBitmap = bitmap
-        }
-
-        return runInference(srcBitmap, cropLeft, cropTop)
+        val crop = cropRect ?: android.graphics.Rect(0, 0, bitmap.width, bitmap.height)
+        return runInference(bitmap, crop)
     }
 
-    private fun runInference(bitmap: Bitmap, cropLeft: Int, cropTop: Int): List<Detection> {
-        val origW = bitmap.width
-        val origH = bitmap.height
+    /**
+     * IMPORTANT PERF FIX: this used to call
+     * `Bitmap.createBitmap(bitmap, cropRect.left, cropRect.top, w, h)` to get
+     * a cropped bitmap before letterboxing. That call is NOT free for a real
+     * sub-region — despite what the old comment here claimed, Android only
+     * returns the same backing bitmap when the "crop" is the entire source;
+     * for a genuine sub-rect it allocates a brand new Bitmap and does a full
+     * native pixel blit, every single frame. That's a real per-frame
+     * allocation (GC pressure) + copy on top of the letterbox work below.
+     *
+     * Fixed by reading the FULL frame's pixels once into the reusable
+     * [srcPixels] buffer and letterboxing directly out of [crop]'s region of
+     * THAT array — zero extra Bitmap objects, one pixel read per frame
+     * instead of two.
+     */
+    private fun runInference(bitmap: Bitmap, crop: android.graphics.Rect): List<Detection> {
+        val fullW = bitmap.width
+        val fullH = bitmap.height
+        val origW = crop.width()
+        val origH = crop.height()
+        val cropLeft = crop.left
+        val cropTop  = crop.top
         val INPUT_SIZE = inputSize
 
         // Resize source-pixel buffer only when camera resolution actually changes
-        if (srcPixelsW != origW || srcPixelsH != origH) {
-            srcPixels = IntArray(origW * origH)
-            srcPixelsW = origW
-            srcPixelsH = origH
+        if (srcPixelsW != fullW || srcPixelsH != fullH) {
+            srcPixels = IntArray(fullW * fullH)
+            srcPixelsW = fullW
+            srcPixelsH = fullH
         }
-        bitmap.getPixels(srcPixels, 0, origW, 0, 0, origW, origH)
+        bitmap.getPixels(srcPixels, 0, fullW, 0, 0, fullW, fullH)
 
         // 1. Letterbox geometry (kept aspect ratio, matches OverlayView math)
         val scale    = min(INPUT_SIZE / origW.toFloat(), INPUT_SIZE / origH.toFloat())
@@ -230,11 +239,15 @@ class YoloDetector(private val context: Context) {
 
         // 2. Direct nearest-neighbour resize + letterbox straight into the
         //    normalised planar float tensor — zero extra allocations, zero Bitmaps.
+        //    Source pixels are read from srcPixels at (cropLeft+sx, cropTop+sy)
+        //    against the FULL frame's row stride (fullW) — this is what lets
+        //    us skip ever materializing a separate cropped Bitmap.
         for (y in 0 until INPUT_SIZE) {
             val srcY = y - padTop
             val rowIsPad = srcY < 0 || srcY >= newH
             val sy = if (rowIsPad) 0 else (srcY * origH / newH).coerceIn(0, origH - 1)
             val rowBase = y * INPUT_SIZE
+            val srcRowOffset = (cropTop + sy) * fullW + cropLeft
             for (x in 0 until INPUT_SIZE) {
                 val srcX = x - padLeft
                 if (rowIsPad || srcX < 0 || srcX >= newW) {
@@ -243,7 +256,7 @@ class YoloDetector(private val context: Context) {
                     inputBuffer[bOff + rowBase + x] = padVal
                 } else {
                     val sx = (srcX * origW / newW).coerceIn(0, origW - 1)
-                    val px = srcPixels[sy * origW + sx]
+                    val px = srcPixels[srcRowOffset + sx]
                     inputBuffer[rOff + rowBase + x] = ((px shr 16) and 0xFF) * (1f / 255f)
                     inputBuffer[gOff + rowBase + x] = ((px shr  8) and 0xFF) * (1f / 255f)
                     inputBuffer[bOff + rowBase + x] = ( px         and 0xFF) * (1f / 255f)
@@ -260,10 +273,14 @@ class YoloDetector(private val context: Context) {
         val t0 = System.nanoTime()
         val result = ortSession!!.run(mapOf("images" to tensor))
         val inferMs = (System.nanoTime() - t0) / 1_000_000f
+        lastInferenceMs = inferMs
         tensor.close()
-        // Throttled so it doesn't spam logcat — one line per ~15 frames is
-        // enough to watch the trend while testing an EP/model change.
-        if (++frameCounter % 15 == 0) Log.d(TAG, "inference: ${"%.1f".format(inferMs)}ms")
+        // First 10 frames log every time (so a fresh run immediately shows
+        // real on-device numbers); after that, throttle to avoid log spam.
+        frameCounter++
+        if (frameCounter <= 10 || frameCounter % 15 == 0) {
+            Log.i(TAG, "inference: ${"%.1f".format(inferMs)}ms (${INPUT_SIZE}x$INPUT_SIZE)")
+        }
 
         // 4. Parse [1, 4+numClass, numAnchors] → each anchor: [cx,cy,w,h, s0..sN]
         //    numAnchors is read from the actual output tensor rather than a

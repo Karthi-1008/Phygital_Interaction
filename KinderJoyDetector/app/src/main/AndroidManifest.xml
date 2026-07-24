@@ -8,6 +8,13 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
+    <!-- ARCore: "required=false" so the app still installs on devices without
+         Google Play Services for AR (ARSessionManager checks availability at
+         runtime and falls back to the existing 2D-overlay flow — see
+         ArAvailability handling in ARSessionManager.kt). -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+    <meta-data android:name="com.google.ar.core" android:value="optional" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

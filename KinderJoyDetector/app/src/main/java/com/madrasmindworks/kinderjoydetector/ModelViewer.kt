@@ -1,5 +1,6 @@
 package com.madrasmindworks.kinderjoydetector
 
+import android.graphics.PixelFormat
 import android.opengl.Matrix
 import android.util.Log
 import android.view.Choreographer
@@ -11,7 +12,6 @@ import com.google.android.filament.EntityManager
 import com.google.android.filament.LightManager
 import com.google.android.filament.Renderer
 import com.google.android.filament.Scene
-import com.google.android.filament.Skybox
 import com.google.android.filament.SwapChain
 import com.google.android.filament.Viewport
 import com.google.android.filament.View
@@ -109,6 +109,16 @@ class ModelViewer(private val surfaceView: SurfaceView) : SurfaceHolder.Callback
         try {
             ensureNativeLibLoaded()
 
+            // AR compositing: this SurfaceView must draw ON TOP of the
+            // camera preview (which is a TextureView now — see
+            // implementationMode="compatible" in activity_main.xml — so
+            // there's no other SurfaceView to fight for z-order with), and
+            // its pixel format must carry an alpha channel so the parts of
+            // the frame Filament clears stay see-through to the camera feed
+            // beneath, instead of painting an opaque black/gray rectangle.
+            surfaceView.setZOrderOnTop(true)
+            surfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
+
             val eng = Engine.create()
             val scn = eng.createScene()
             val camEntity = EntityManager.get().create()
@@ -116,11 +126,22 @@ class ModelViewer(private val surfaceView: SurfaceView) : SurfaceHolder.Callback
             val vw = eng.createView().apply {
                 scene = scn
                 camera = cam
+                // Blend the rendered model over whatever is already on
+                // screen (the live camera feed) instead of opaquely
+                // overwriting every pixel — this is what makes the toy
+                // appear to sit "in" the real scene rather than in a boxed
+                // preview pane.
+                blendMode = View.BlendMode.TRANSLUCENT
             }
 
             engine = eng
             scene = scn
-            renderer = eng.createRenderer()
+            renderer = eng.createRenderer().apply {
+                clearOptions = Renderer.ClearOptions().apply {
+                    clear = true
+                    clearColor = floatArrayOf(0f, 0f, 0f, 0f)   // fully transparent
+                }
+            }
             cameraEntity = camEntity
             camera = cam
             view = vw
@@ -129,8 +150,9 @@ class ModelViewer(private val surfaceView: SurfaceView) : SurfaceHolder.Callback
 
             surfaceView.holder.addCallback(this)
             setupLights(eng, scn)
-            // Simple dark solid background — no IBL texture needs bundling/decoding.
-            scn.skybox = Skybox.Builder().color(0.06f, 0.05f, 0.10f, 1.0f).build(eng)
+            // No skybox — a skybox would paint a solid background over the
+            // camera feed. Lighting alone (see setupLights) is enough to
+            // shade the model correctly against a transparent backdrop.
 
             isAvailable = true
         } catch (t: Throwable) {
@@ -198,6 +220,11 @@ class ModelViewer(private val surfaceView: SurfaceView) : SurfaceHolder.Callback
     private fun positionCamera() {
         // Model is normalized into roughly [-1, 1]^3 by fitToUnitCube — a fixed
         // camera distance/FOV therefore frames it consistently on every screen.
+        // Deliberately static: no per-frame orbit/rotation is ever applied to
+        // this camera or the model's root transform, so once locked onto the
+        // detected toy's screen position (see MainActivity), both the position
+        // AND rotation stay put for the rest of the reveal — only the glTF's
+        // own embedded skeletal animation (played via playAnimation) moves.
         camera?.lookAt(0.0, 0.3, 4.2, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
         camera?.setExposure(16.0f, 1.0f / 125.0f, 100.0f)
     }

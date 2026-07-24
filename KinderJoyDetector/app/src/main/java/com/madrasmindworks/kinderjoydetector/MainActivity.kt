@@ -9,17 +9,23 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.util.Log
 import android.util.Size
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.madrasmindworks.kinderjoydetector.databinding.ActivityMainBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
 
@@ -41,25 +47,31 @@ class MainActivity : AppCompatActivity() {
     // Reused across frames — camera resolution is fixed, so allocate once
     private var reusableBitmap: Bitmap? = null
 
-    // Guide box, defined once in FRAME pixel coords (lazily, once frame size known)
+    // Guide box in FRAME pixel coords — recomputed whenever the camera's
+    // actual output size changes (device/rotation dependent), not just once,
+    // so it stays correct across every device/screen/camera combination.
     private var guideBoxFrame: RectF? = null
     private var guideBoxRect: Rect? = null   // integer version, used for the crop
+    private var lastFrameW = -1
+    private var lastFrameH = -1
 
-    // Temporal smoothing: hold the last-seen detections briefly when a single
-    // frame comes back empty/borderline, so the box doesn't flicker.
-    private var lastDets: List<YoloDetector.Detection> = emptyList()
-    private var framesSinceLastDet = 0
-    private val HOLD_FRAMES = 4
-
-    // "Hold the toy in the box" progress — fills while a confident detection
-    // sits inside the guide box, decays when it doesn't.
-    private var progress = 0f
-    private val PROGRESS_STEP = 0.055f   // ~ fills in well under 2s at typical FPS
-    private val PROGRESS_DECAY = 0.09f
+    // Trigger rule: confidence >= 80% on the SAME class for 3 consecutive
+    // frames fires the animation immediately — no progress-bar smoothing,
+    // no extra verification pass once that condition is met.
+    private var streakClass: Int? = null
+    private var streakCount = 0
+    private val CONFIDENCE_TRIGGER = 0.80f
+    private val STREAK_REQUIRED = 3
 
     // Once true, all further frame processing / camera analysis stops until
     // the user taps "Scan Again". Nothing runs in the background meanwhile.
     @Volatile private var detectionLocked = false
+
+    // FPS — exponential moving average over actually-processed frames
+    // (frames skipped because a previous one was still running, or because
+    // detection is locked, don't count — this reflects true throughput).
+    private var lastFrameNanos = 0L
+    private var fpsEma = 0f
 
     // className index -> celebration asset info
     private data class ToyAsset(val assetPath: String, val animationIndex: Int?, val emoji: String)
@@ -133,18 +145,44 @@ class MainActivity : AppCompatActivity() {
 
     // ── Camera ────────────────────────────────────────────────────────────────
 
+    // Target capture size only — NOT the model's input size. The model's
+    // tensor is always exactly 640x640 regardless of what the sensor
+    // delivers, because YoloDetector letterboxes whatever crop it receives
+    // into that fixed size (see runInference()). This selector just asks
+    // CameraX for a stream close to that area so the crop+resize work stays
+    // cheap; every device that reports a different native size still works
+    // correctly, it just resizes from a different starting point.
+    private val CAMERA_TARGET = Size(640, 480)
+
+    /**
+     * setTargetResolution() (the old API) is deprecated AND unreliable — it's
+     * only a "hint" CameraX is free to ignore, and different OEM camera HALs
+     * pick wildly different actual sizes for the same hint. ResolutionSelector
+     * is the modern replacement: it picks the closest AVAILABLE stream size
+     * to our target and degrades gracefully (closest-higher, then
+     * closest-lower) on every device instead of silently substituting an
+     * arbitrary resolution.
+     */
+    private fun buildResolutionSelector(): ResolutionSelector =
+        ResolutionSelector.Builder()
+            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+            .setResolutionStrategy(
+                ResolutionStrategy(CAMERA_TARGET, ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)
+            )
+            .build()
+
     private fun startCamera() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
             cameraProvider = future.get()
 
             val preview = Preview.Builder()
-                .setTargetResolution(Size(480, 640))   // portrait — smaller = faster
+                .setResolutionSelector(buildResolutionSelector())
                 .build()
                 .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
 
             val analysis = ImageAnalysis.Builder()
-                .setTargetResolution(Size(480, 640))
+                .setResolutionSelector(buildResolutionSelector())
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
@@ -159,16 +197,20 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    /** Fully stops the camera + analyzer — no background work runs after this. */
-    private fun stopCamera() {
-        if (::cameraProvider.isInitialized) cameraProvider.unbindAll()
-    }
-
     // ── Guide box ─────────────────────────────────────────────────────────────
 
-    /** Centered square guide box, ~62% of the shorter frame dimension. */
+    /**
+     * Centered square guide box, ~62% of the shorter frame dimension.
+     * Recomputed whenever the actual camera frame size changes (first frame,
+     * a device that reports a different stream size than expected, or an
+     * orientation/config change) instead of being frozen after the first
+     * call — this is what makes the box correct on every device/camera/
+     * screen combination rather than just the one it happened to start on.
+     */
     private fun ensureGuideBox(frameW: Int, frameH: Int) {
-        if (guideBoxFrame != null) return
+        if (guideBoxFrame != null && frameW == lastFrameW && frameH == lastFrameH) return
+        lastFrameW = frameW
+        lastFrameH = frameH
         val size = (minOf(frameW, frameH) * 0.62f)
         val left = (frameW - size) / 2f
         val top  = (frameH - size) / 2f
@@ -181,6 +223,18 @@ class MainActivity : AppCompatActivity() {
     private fun processFrame(image: ImageProxy) {
         if (isProcessing || detectionLocked) { image.close(); return }
         isProcessing = true
+
+        // FPS: measured across actually-processed frames (skipped frames
+        // above don't count — this is real throughput, not camera rate).
+        val now = System.nanoTime()
+        if (lastFrameNanos != 0L) {
+            val dt = (now - lastFrameNanos) / 1_000_000_000f
+            if (dt > 0f) {
+                val instFps = 1f / dt
+                fpsEma = if (fpsEma == 0f) instFps else fpsEma * 0.9f + instFps * 0.1f
+            }
+        }
+        lastFrameNanos = now
 
         val bmp = imageProxyToBitmap(image)
         image.close()    // release camera buffer immediately
@@ -205,32 +259,32 @@ class MainActivity : AppCompatActivity() {
         // Only detections that substantially overlap the guide box count —
         // a toy peeking in at the edge of the crop margin shouldn't register.
         val inBoxDets = rawDets.filter { iou(it.rect, boxF) > 0.30f }
+        val top = inBoxDets.maxByOrNull { it.confidence }
 
-        // Temporal smoothing
-        val dets: List<YoloDetector.Detection>
-        if (inBoxDets.isNotEmpty()) {
-            dets = inBoxDets
-            lastDets = inBoxDets
-            framesSinceLastDet = 0
-        } else if (framesSinceLastDet < HOLD_FRAMES) {
-            dets = lastDets
-            framesSinceLastDet++
+        // Trigger rule, exactly as specified: confidence >= 80% on the same
+        // class, 3 frames running. Any frame that doesn't clear the bar, or
+        // that clears it on a DIFFERENT class, resets the streak to zero —
+        // no extra checks once the streak hits 3, it fires immediately.
+        if (top != null && top.confidence >= CONFIDENCE_TRIGGER) {
+            streakCount = if (top.classIndex == streakClass) streakCount + 1 else 1
+            streakClass = top.classIndex
         } else {
-            dets = emptyList()
+            streakClass = null
+            streakCount = 0
         }
 
-        // Progress: fill while something valid is held in the box, decay otherwise
-        if (dets.isNotEmpty()) progress += PROGRESS_STEP else progress -= PROGRESS_DECAY
-        progress = progress.coerceIn(0f, 1f)
-
-        val completed = progress >= 1f
+        val completed = streakCount >= STREAK_REQUIRED
         if (completed) detectionLocked = true   // stop taking on new frames immediately
 
         runOnUiThread {
             binding.overlayView.setFrameGeometry(srcW, srcH, boxF)
-            binding.overlayView.setProgress(progress, dets.isNotEmpty())
-            updateStatus(dets)
-            if (completed) onDetectionComplete(dets.first())
+            binding.overlayView.setProgress(
+                streakCount / STREAK_REQUIRED.toFloat(),
+                top != null && top.confidence >= CONFIDENCE_TRIGGER
+            )
+            updateStatus(top)
+            binding.fpsText.text = "${fpsEma.roundToInt()} FPS · ${"%.0f".format(detector.lastInferenceMs)}ms"
+            if (completed && top != null) onDetectionComplete(top)
         }
 
         isProcessing = false
@@ -273,46 +327,97 @@ class MainActivity : AppCompatActivity() {
 
     // ── Status text ───────────────────────────────────────────────────────────
 
-    private fun updateStatus(dets: List<YoloDetector.Detection>) {
+    private fun updateStatus(top: YoloDetector.Detection?) {
         binding.statusText.text = when {
-            dets.isEmpty() -> "Hold a toy inside the box"
-            else -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}% — hold steady…"
+            top == null -> "Hold a toy inside the box"
+            top.confidence < CONFIDENCE_TRIGGER ->
+                "${top.className}  ${"%.0f".format(top.confidence * 100)}% — a little closer…"
+            else ->
+                "${top.className}  ${"%.0f".format(top.confidence * 100)}% — hold steady ($streakCount/$STREAK_REQUIRED)"
         }
-        binding.statusText.setTextColor(if (dets.isEmpty()) Color.LTGRAY else Color.WHITE)
+        binding.statusText.setTextColor(if (top == null) Color.LTGRAY else Color.WHITE)
     }
 
-    // ── Success → celebration ────────────────────────────────────────────────
+    // ── Success → screen-locked AR reveal ───────────────────────────────────
+    // The camera feed is NEVER stopped or hidden here — that's what makes
+    // this feel like AR rather than a "results screen". Only the analyzer
+    // stops doing work (via detectionLocked, checked at the top of
+    // processFrame). The .glb renders on a transparent SurfaceView sized and
+    // positioned to exactly cover the toy's last-known screen rect, so the
+    // character appears to pop up right where the toy is, in place, with a
+    // fixed (non-orbiting) camera — not drifting, not a separate preview pane.
 
     private fun onDetectionComplete(det: YoloDetector.Detection) {
         try {
             onDetectionCompleteInternal(det)
         } catch (t: Throwable) {
-            Log.e(TAG, "Celebration screen failed — showing fallback text only", t)
-            binding.celebrationContainer.visibility = View.VISIBLE
+            Log.e(TAG, "AR reveal failed — showing fallback text only", t)
+            binding.celebrationTitle.visibility = View.VISIBLE
             binding.celebrationTitle.text = "🎉 ${det.className} found!"
         }
     }
 
+    /** Converts a rect in camera-FRAME pixel coords to on-screen VIEW pixel coords, matching OverlayView's fitCenter math exactly. */
+    private fun frameRectToViewRect(r: RectF, viewW: Int, viewH: Int, frameW: Int, frameH: Int): RectF {
+        val scale   = minOf(viewW.toFloat() / frameW, viewH.toFloat() / frameH)
+        val offsetX = (viewW - frameW * scale) / 2f
+        val offsetY = (viewH - frameH * scale) / 2f
+        return RectF(
+            r.left * scale + offsetX, r.top * scale + offsetY,
+            r.right * scale + offsetX, r.bottom * scale + offsetY
+        )
+    }
+
     private fun onDetectionCompleteInternal(det: YoloDetector.Detection) {
-        stopCamera()   // no background camera/inference work while celebrating
-
-        binding.previewView.visibility = View.GONE
-        binding.overlayView.visibility = View.GONE
-        binding.statusText.visibility = View.GONE
-        binding.celebrationContainer.visibility = View.VISIBLE
-
         val toy = TOY_ASSETS[det.classIndex]
-        binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!"
 
-        val viewer = modelViewer ?: ModelViewer(binding.modelSurface).also { modelViewer = it }
-        if (!viewer.isAvailable) {
-            // 3D isn't available on this device (e.g. no OpenGL ES 3 support,
-            // or a native lib mismatch) — fail soft: keep the celebration
-            // text/emoji and "Scan Again" working instead of crashing.
-            Log.w(TAG, "ModelViewer unavailable: ${viewer.lastError}")
-            binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!\n(3D preview unavailable on this device)"
+        val viewer = modelViewer
+        if (viewer == null || !viewer.isAvailable) {
+            Log.w(TAG, "ModelViewer unavailable: ${viewer?.lastError}")
+            binding.celebrationTitle.visibility = View.VISIBLE
+            binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found! (3D unavailable on this device)"
+            binding.btnScanAgain.visibility = View.VISIBLE
             return
         }
+
+        // Lock the model to the toy's screen position at the moment of
+        // detection — inflated a bit beyond the tight bounding box so the
+        // character has room to render, and never touched again afterwards
+        // (no re-tracking, no drift, no rotation animation).
+        val arLayerW = binding.arLayer.width
+        val arLayerH = binding.arLayer.height
+        val inflated = RectF(det.rect).apply {
+            val padX = width() * 0.45f
+            val padY = height() * 0.45f
+            inset(-padX, -padY)
+        }
+        val vr = frameRectToViewRect(inflated, arLayerW, arLayerH, lastFrameW, lastFrameH)
+
+        val params = FrameLayout.LayoutParams(
+            vr.width().toInt().coerceAtLeast(1),
+            vr.height().toInt().coerceAtLeast(1)
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            leftMargin = vr.left.toInt().coerceAtLeast(0)
+            topMargin = vr.top.toInt().coerceAtLeast(0)
+        }
+        binding.modelSurface.layoutParams = params
+        binding.modelSurface.visibility = View.VISIBLE
+
+        binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!"
+        binding.celebrationTitle.visibility = View.VISIBLE
+        binding.celebrationTitle.post {
+            // Placed once the label is measured, so it sits centered directly
+            // above the locked model box regardless of label text length.
+            val lp = binding.celebrationTitle.layoutParams as FrameLayout.LayoutParams
+            lp.gravity = Gravity.TOP or Gravity.START
+            lp.leftMargin = (vr.centerX() - binding.celebrationTitle.width / 2f).toInt().coerceAtLeast(8)
+            lp.topMargin = (vr.top - binding.celebrationTitle.height - 12).toInt().coerceAtLeast(8)
+            binding.celebrationTitle.layoutParams = lp
+        }
+
+        binding.btnScanAgain.visibility = View.VISIBLE
+
         if (toy != null) {
             try {
                 val bytes = glbBytesCache[toy.assetPath] ?: assets.open(toy.assetPath).readBytes()
@@ -329,23 +434,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** "Scan Again" — tears down the celebration and resumes live detection. */
+    /**
+     * "Scan Again" — tears down the AR overlay and resumes live detection.
+     * The camera was never stopped, so this is instant: no rebind, no
+     * preview flicker, just clearing state and letting processFrame() run
+     * again.
+     */
     private fun resetForNewScan() {
         modelViewer?.destroyModel()
 
-        binding.celebrationContainer.visibility = View.GONE
-        binding.previewView.visibility = View.VISIBLE
-        binding.overlayView.visibility = View.VISIBLE
-        binding.statusText.visibility = View.VISIBLE
+        binding.modelSurface.visibility = View.GONE
+        binding.celebrationTitle.visibility = View.GONE
+        binding.btnScanAgain.visibility = View.GONE
 
-        progress = 0f
-        lastDets = emptyList()
-        framesSinceLastDet = 0
+        streakClass = null
+        streakCount = 0
         detectionLocked = false
         binding.overlayView.setProgress(0f, false)
         binding.statusText.text = "Point camera at a toy — hold it in the box"
-
-        startCamera()
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────

@@ -19,11 +19,19 @@ android {
         // Enable multi-dex for older devices
         multiDexEnabled true
 
-        // Package native libs for every architecture Filament/ONNX Runtime
-        // ship prebuilt binaries for, so the app runs on any real device AND
-        // any emulator (x86/x86_64 included) rather than just arm64 phones.
+        // SIZE: this is the single biggest lever available. Filament +
+        // ONNX Runtime ship a separate compiled .so per ABI, and each one
+        // individually runs several MB — a universal APK carrying all four
+        // (arm64-v8a, armeabi-v7a, x86, x86_64) roughly quadruples native
+        // lib weight for architectures almost nobody actually has. Real
+        // phones sold in the last ~7 years are effectively all arm64-v8a;
+        // 32-bit armeabi-v7a and any x86/x86_64 device only matter for a
+        // small tail of legacy hardware and emulators. Restricting to
+        // arm64-v8a alone is what actually shrinks the APK — no build flag
+        // fixes this without dropping ABIs. Re-add "armeabi-v7a" here if you
+        // have confirmed users on 32-bit-only devices.
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            abiFilters "arm64-v8a"
         }
     }
 
@@ -60,13 +68,20 @@ android {
         noCompress "glb"
     }
 
-    // ABI splits for smaller APK sizes per architecture
+    // With abiFilters now locked to arm64-v8a only, there's only one ABI
+    // being built at all, so ABI splits have nothing left to split — this
+    // block is now a no-op and left disabled. If you ever re-add more ABIs
+    // above, the real fix for per-user download size is building an
+    // Android App Bundle (`./gradlew bundleRelease`) instead of an APK and
+    // publishing that to Play — Play then serves each device ONLY the .so
+    // files for its own ABI automatically, without you managing split APKs
+    // by hand at all.
     splits {
         abi {
-            enable false  // Set true to generate per-ABI APKs; false for universal APK
+            enable false
             reset()
-            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
-            universalApk true
+            include "arm64-v8a"
+            universalApk false
         }
     }
 
@@ -109,4 +124,16 @@ dependencies {
     implementation "com.google.android.filament:filament-android:${filament_version}"
     implementation "com.google.android.filament:gltfio-android:${filament_version}"
     implementation "com.google.android.filament:filament-utils-android:${filament_version}"
+
+    // ARCore — world tracking + hit-test + anchors for the new AR-lock path.
+    // ModelViewer.kt (Filament-only) still powers the OLD 2D-locked-in-box
+    // celebration path as a fallback for devices ARCore doesn't support.
+    implementation "com.google.ar:core:1.42.0"
+
+    // SceneView (ARSceneView) — Filament-based renderer built specifically
+    // for ARCore, per the integration plan's "do not use Sceneform" and
+    // "use SceneView (Filament-based)" requirements. It owns the ARCore
+    // Session + camera feed once installed (see ARSessionManager.kt) and
+    // renders anchored GLB nodes with animation support out of the box.
+    implementation "io.github.sceneview:arsceneview:2.2.1"
 }

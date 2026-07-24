@@ -6,7 +6,10 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Camera preview — fitCenter so FULL frame is visible, no cropping -->
+    <!-- Camera preview — fitCenter so FULL frame is visible, no cropping.
+         implementationMode="compatible" forces a TextureView internally
+         instead of a SurfaceView, so it composites normally in the view
+         hierarchy and never fights the AR layer's SurfaceView for z-order. -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="0dp"
@@ -15,7 +18,8 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:scaleType="fitCenter" />
+        app:scaleType="fitCenter"
+        app:implementationMode="compatible" />
 
     <!-- Overlay: guide box + progress ring only (see OverlayView.kt) -->
     <com.madrasmindworks.kinderjoydetector.OverlayView
@@ -26,6 +30,47 @@
         app:layout_constraintBottom_toBottomOf="@id/previewView"
         app:layout_constraintStart_toStartOf="@id/previewView"
         app:layout_constraintEnd_toEndOf="@id/previewView" />
+
+    <!-- AR layer: sits above the live camera feed, never intercepts touches.
+         Holds the toy's screen-locked 3D reveal (modelSurface) and its label
+         (celebrationTitle), both positioned in code to match the detected
+         toy's on-screen box — the camera is NEVER hidden behind this. -->
+    <FrameLayout
+        android:id="@+id/arLayer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clickable="false"
+        android:focusable="false"
+        app:layout_constraintTop_toTopOf="@id/previewView"
+        app:layout_constraintBottom_toBottomOf="@id/previewView"
+        app:layout_constraintStart_toStartOf="@id/previewView"
+        app:layout_constraintEnd_toEndOf="@id/previewView">
+
+        <!-- Transparent SurfaceView — ModelViewer.kt renders the .glb here
+             with a fully alpha-cleared background, so only the model itself
+             is opaque and the camera feed shows through everywhere else.
+             Size/position set programmatically in MainActivity to lock onto
+             the detected toy's screen rect. Starts at 0x0/gone. -->
+        <SurfaceView
+            android:id="@+id/modelSurface"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/celebrationTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#CC000000"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:text="🎉 Found it!"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
     <!-- Minimal top title -->
     <TextView
@@ -39,6 +84,38 @@
         android:textSize="15sp"
         android:textStyle="bold"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- FPS counter — small corner readout, always visible -->
+    <TextView
+        android:id="@+id/fpsText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#AA000000"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="4dp"
+        android:text="-- FPS"
+        android:textColor="#00E676"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="6dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Small floating "Scan again" — appears only once a toy is locked in;
+         camera keeps running behind it, so tapping it is instant. -->
+    <Button
+        android:id="@+id/btnScanAgain"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Scan again"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:layout_marginBottom="14dp"
+        app:layout_constraintBottom_toTopOf="@id/statusText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -58,54 +135,5 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- ══════════════════ Celebration screen (shown on success) ══════════════════
-         Fully replaces the camera UI while the .glb animation plays — camera +
-         inference are unbound/stopped for this whole screen, per requirement
-         that no background scanning runs while the celebration plays. -->
-    <LinearLayout
-        android:id="@+id/celebrationContainer"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:orientation="vertical"
-        android:background="#0F0A1F"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <TextView
-            android:id="@+id/celebrationTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="28dp"
-            android:paddingBottom="8dp"
-            android:paddingHorizontal="16dp"
-            android:text="🎉 Found it!"
-            android:textAlignment="center"
-            android:textColor="#FFFFFF"
-            android:textSize="26sp"
-            android:textStyle="bold" />
-
-        <!-- The .glb model renders into this surface, auto-fit to a unit cube
-             by ModelViewer.kt so it looks consistent on any screen size. -->
-        <SurfaceView
-            android:id="@+id/modelSurface"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="8dp" />
-
-        <Button
-            android:id="@+id/btnScanAgain"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="20dp"
-            android:text="Scan Again"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
