@@ -142,5 +142,15 @@ dependencies {
     // "use SceneView (Filament-based)" requirements. It owns the ARCore
     // Session + camera feed once installed (see ARSessionManager.kt) and
     // renders anchored GLB nodes with animation support out of the box.
-    implementation "io.github.sceneview:arsceneview:2.2.1"
+    //
+    // Pinned to 2.3.1, NOT 2.2.1. The 2.0→2.1 changelog shows heavy internal
+    // churn (renamed files, restructured node hierarchy) right around where
+    // 2.2.1 sits, which is almost certainly why `ArSceneView` failed to
+    // resolve — `AnchorNode`/`ModelNode` from the same package resolved
+    // fine, proving the artifact itself was on the classpath; only that one
+    // class name/location was the problem. 2.3.1 is the last stable release
+    // before SceneView's unrelated 4.x rewrite (a full Jetpack-Compose-only
+    // API — @Composable functions, not this XML View-based ArSceneView — so
+    // do NOT bump straight to 4.x expecting this code to still compile).
+    implementation "io.github.sceneview:arsceneview:2.3.1"
 }
