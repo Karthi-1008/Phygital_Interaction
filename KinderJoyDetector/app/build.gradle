@@ -9,7 +9,14 @@ android {
 
     defaultConfig {
         applicationId "com.madrasmindworks.kinderjoydetector"
-        minSdk 21
+        // Bumped from 21 → 24. This isn't really a SceneView-specific
+        // requirement — com.google.ar:core itself declares minSdk 24 (ARCore
+        // requires Android 7.0+ for its camera/tracking APIs), so any ARCore
+        // path forces this regardless of which wrapper library sits on top
+        // of it. Devices below API 24 are a small and shrinking slice of
+        // real-world Android usage at this point, so this is the right
+        // trade — not a workaround.
+        minSdk 24
         targetSdk 34
         versionCode 1
         versionName "1.0"
