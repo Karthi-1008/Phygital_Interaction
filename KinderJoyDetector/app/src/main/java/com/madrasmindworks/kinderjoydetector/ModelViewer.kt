@@ -10,8 +10,6 @@ import com.google.android.filament.*
 import com.google.android.filament.android.DisplayHelper
 import com.google.android.filament.android.UiHelper
 import com.google.android.filament.gltfio.*
-import com.google.android.filament.utils.Float3
-import com.google.android.filament.utils.Mat4
 import java.nio.ByteBuffer
 import kotlin.math.max
 
@@ -91,7 +89,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
             displayHelper = DisplayHelper(surfaceView.context)
             uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK).apply {
-                renderCallback = object : UiHelper.RenderCallback {
+                renderCallback = object : UiHelper.RendererCallback {
                     override fun onNativeWindowChanged(surface: Surface) {
                         swapChain?.let { engine?.destroySwapChain(it) }
                         swapChain = engine?.createSwapChain(surface)
@@ -100,7 +98,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
                     override fun onDetachedFromSurface() {
                         swapChain?.let {
                             engine?.destroySwapChain(it)
-                            engine?.flush()
+                            engine?.flushAndWait()
                         }
                         swapChain = null
                     }
@@ -155,12 +153,13 @@ class ModelViewer(val surfaceView: SurfaceView) {
             val maxExtent = max(halfExtent[0], max(halfExtent[1], halfExtent[2]))
             val scaleFactor = if (maxExtent > 0f) 0.6f / maxExtent else 1.0f
 
-            val transform = Mat4.translation(Float3(-center[0] * scaleFactor, -center[1] * scaleFactor, -center[2] * scaleFactor - 2.5f)) *
-                    Mat4.scale(Float3(scaleFactor, scaleFactor, scaleFactor))
+            val t1 = createTranslationMat4(-center[0] * scaleFactor, -center[1] * scaleFactor, -center[2] * scaleFactor - 2.5f)
+            val s1 = createScaleMat4(scaleFactor, scaleFactor, scaleFactor)
+            val transform = multiplyMat4(t1, s1)
 
             val tm = engine!!.transformManager
             val rootInstance = tm.getInstance(asset.root)
-            tm.setTransform(rootInstance, transform.toFloatArray())
+            tm.setTransform(rootInstance, transform)
 
             Log.i(TAG, "GLB asset loaded into AR scene successfully")
         } catch (e: Exception) {
@@ -201,12 +200,14 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
         val finalScale = baseScale * modelScale
 
-        val transformMat = Mat4.translation(Float3(targetX, targetY, -2.5f)) *
-                Mat4.rotation(rotAngle, Float3(0f, 1f, 0f)) *
-                Mat4.scale(Float3(finalScale, finalScale, finalScale)) *
-                Mat4.translation(Float3(-center[0], -center[1], -center[2]))
+        val t1 = createTranslationMat4(targetX, targetY, -2.5f)
+        val r1 = createRotationYMat4(rotAngle)
+        val s1 = createScaleMat4(finalScale, finalScale, finalScale)
+        val t2 = createTranslationMat4(-center[0], -center[1], -center[2])
 
-        tm.setTransform(rootInstance, transformMat.toFloatArray())
+        val transformMat = multiplyMat4(t1, multiplyMat4(r1, multiplyMat4(s1, t2)))
+
+        tm.setTransform(rootInstance, transformMat)
     }
 
     fun playAnimation(index: Int?, loop: Boolean = true, onComplete: (() -> Unit)? = null) {
@@ -299,5 +300,51 @@ class ModelViewer(val surfaceView: SurfaceView) {
         view = null
         renderer = null
         swapChain = null
+    }
+
+    // ── 4x4 Matrix Math Helpers ──────────────────────────────────────────────
+
+    private fun multiplyMat4(a: FloatArray, b: FloatArray): FloatArray {
+        val res = FloatArray(16)
+        for (i in 0 until 4) {
+            for (j in 0 until 4) {
+                var sum = 0f
+                for (k in 0 until 4) {
+                    sum += a[k * 4 + i] * b[j * 4 + k]
+                }
+                res[j * 4 + i] = sum
+            }
+        }
+        return res
+    }
+
+    private fun createTranslationMat4(x: Float, y: Float, z: Float): FloatArray {
+        return floatArrayOf(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            x,  y,  z,  1f
+        )
+    }
+
+    private fun createScaleMat4(sx: Float, sy: Float, sz: Float): FloatArray {
+        return floatArrayOf(
+            sx, 0f, 0f, 0f,
+            0f, sy, 0f, 0f,
+            0f, 0f, sz, 0f,
+            0f, 0f, 0f, 1f
+        )
+    }
+
+    private fun createRotationYMat4(angleDeg: Float): FloatArray {
+        val rad = Math.toRadians(angleDeg.toDouble()).toFloat()
+        val c = Math.cos(rad.toDouble()).toFloat()
+        val s = Math.sin(rad.toDouble()).toFloat()
+        return floatArrayOf(
+            c,  0f, -s, 0f,
+            0f, 1f, 0f, 0f,
+            s,  0f,  c, 0f,
+            0f, 0f, 0f, 1f
+        )
     }
 }
