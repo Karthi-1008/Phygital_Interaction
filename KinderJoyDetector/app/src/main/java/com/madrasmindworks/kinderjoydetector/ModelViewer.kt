@@ -182,9 +182,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
             resourceLoader?.loadResources(asset)
             asset.releaseSourceData()
 
-            val countBefore = scene?.entityCount ?: 0
             scene?.addEntities(asset.entities)
-            val countAfter = scene?.entityCount ?: 0
 
             loadedAsset = asset
             animator = asset.instance.animator
@@ -204,7 +202,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
             val rootInstance = tm.getInstance(asset.root)
             tm.setTransform(rootInstance, transform)
 
-            Log.i(TAG, "[AR-DIAG] GLB Loaded Successfully! Root entity=${asset.root}, entitiesCount=${asset.entities.size}, SceneEntityCount: $countBefore -> $countAfter")
+            Log.i(TAG, "[AR-DIAG] GLB Loaded Successfully! Root entity=${asset.root}, entitiesCount=${asset.entities.size}")
         } catch (e: Exception) {
             Log.e(TAG, "[AR-DIAG] GLB failed: ${e.message}", e)
         }
@@ -304,13 +302,11 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
     fun destroyModel() {
         loadedAsset?.let { asset ->
-            val countBefore = scene?.entityCount ?: 0
             scene?.removeEntities(asset.entities)
-            val countAfter = scene?.entityCount ?: 0
             assetLoader?.destroyAsset(asset)
             loadedAsset = null
             animator = null
-            Log.d(TAG, "[AR-DIAG] Active GLB model destroyed: SceneEntityCount $countBefore -> $countAfter")
+            Log.d(TAG, "[AR-DIAG] Active GLB model destroyed: entitiesCount=${asset.entities.size}")
         }
     }
 
