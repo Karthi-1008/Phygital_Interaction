@@ -104,12 +104,12 @@ class MainActivity : AppCompatActivity() {
             cameraProvider = future.get()
 
             val preview = Preview.Builder()
-                .setTargetResolution(Size(480, 640))   // portrait — smaller = faster
+                .setTargetResolution(Size(360, 480))   // Fast & crisp on older phones
                 .build()
                 .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
 
             val analysis = ImageAnalysis.Builder()
-                .setTargetResolution(Size(480, 640))
+                .setTargetResolution(Size(360, 480))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
