@@ -51,11 +51,14 @@ class MainActivity : AppCompatActivity() {
     private var framesSinceLastDet = 0
     private val HOLD_FRAMES = 4
 
-    // Multi-frame temporal stability tracking (Goal 3) & Coverage threshold (Goal 2)
+    // Multi-frame temporal stability tracking & 60% confidence confirmation (Goal 3 & User Request)
     private var candidateClassIndex = -1
     private var candidateFrameCount = 0
-    private val REQUIRED_STABLE_FRAMES = 2
+    private var attemptFrameCount = 0
+    private val REQUIRED_CONFIDENCE = 0.60f
+    private val REQUIRED_STABLE_FRAMES = 3
     private val MIN_COVERAGE = 0.50f
+    private val UNKNOWN_TIMEOUT_FRAMES = 35   // ~2s of holding an object without 60% x 3 confidence
 
     // "Hold the toy in the box" progress — fills while a confident detection
     // sits inside the guide box, decays when it doesn't.
@@ -206,58 +209,89 @@ class MainActivity : AppCompatActivity() {
             (box.bottom + margin).coerceAtMost(srcH)
         )
 
-        // Goal 1 & Adaptive Rotation: early exit if detection satisfies confidence + coverage >= 50%
-        val rawDets = detector.detect(bmp, cropRect) { rect, _, _ ->
-            calculateCoverage(rect, boxF) >= MIN_COVERAGE
+        // Adaptive Rotation: early exit if detection satisfies confidence >= 60% & coverage >= 50%
+        val rawDets = detector.detect(bmp, cropRect) { rect, _, conf ->
+            conf >= REQUIRED_CONFIDENCE && calculateCoverage(rect, boxF) >= MIN_COVERAGE
         }
 
-        // Goal 2: Filter detections requiring coverage >= 50% inside guide box
-        val inBoxDets = rawDets.filter { calculateCoverage(it.rect, boxF) >= MIN_COVERAGE }
+        // Filter detections requiring confidence >= 60% AND coverage >= 50% inside guide box
+        val highConfInBoxDets = rawDets.filter { it.confidence >= REQUIRED_CONFIDENCE && calculateCoverage(it.rect, boxF) >= MIN_COVERAGE }
 
-        // Goal 3: Multi-frame temporal stability filtering (reject single-frame flicker)
-        val dets: List<YoloDetector.Detection>
-        if (inBoxDets.isNotEmpty()) {
-            val topDet = inBoxDets.maxByOrNull { it.confidence }!!
+        val confirmedDet: YoloDetector.Detection?
+        val isConfirmed: Boolean
+
+        if (highConfInBoxDets.isNotEmpty()) {
+            val topDet = highConfInBoxDets.maxByOrNull { it.confidence }!!
             if (topDet.classIndex == candidateClassIndex) {
                 candidateFrameCount++
             } else {
                 candidateClassIndex = topDet.classIndex
                 candidateFrameCount = 1
             }
+            attemptFrameCount++
 
+            // Rule: 60%+ confidence for 3 continuous frames -> CONFIRM TOY (no more scanning/checks!)
             if (candidateFrameCount >= REQUIRED_STABLE_FRAMES) {
-                dets = inBoxDets
-                lastDets = inBoxDets
-                framesSinceLastDet = 0
-            } else if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
-                dets = lastDets
-                framesSinceLastDet++
+                confirmedDet = topDet
+                isConfirmed = true
             } else {
-                dets = emptyList()
+                confirmedDet = null
+                isConfirmed = false
+                lastDets = highConfInBoxDets
+                framesSinceLastDet = 0
             }
         } else {
+            // Check if ANY object is held inside the guide box (even low confidence or un-recognized)
+            val hasObjectInBox = rawDets.any { calculateCoverage(it.rect, boxF) >= 0.20f }
+            if (hasObjectInBox) {
+                attemptFrameCount++
+            } else {
+                attemptFrameCount = (attemptFrameCount - 1).coerceAtLeast(0)
+            }
+
             candidateClassIndex = -1
             candidateFrameCount = 0
-            if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
-                dets = lastDets
-                framesSinceLastDet++
+
+            // Else Condition: If an object is held in the box but fails to reach 60% confidence x 3 continuous frames
+            if (attemptFrameCount >= UNKNOWN_TIMEOUT_FRAMES) {
+                confirmedDet = YoloDetector.Detection(
+                    rect = boxF,
+                    classIndex = -1,
+                    className = "Unknown",
+                    confidence = 0f
+                )
+                isConfirmed = true
             } else {
-                dets = emptyList()
+                confirmedDet = null
+                isConfirmed = false
+                if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
+                    framesSinceLastDet++
+                } else {
+                    lastDets = emptyList()
+                }
             }
         }
 
-        // Progress: fill while a stable valid detection is held in the box, decay otherwise
-        if (dets.isNotEmpty()) progress += PROGRESS_STEP else progress -= PROGRESS_DECAY
-        progress = progress.coerceIn(0f, 1f)
+        if (isConfirmed && confirmedDet != null) {
+            detectionLocked = true   // Stop scanning permanently until user resets
+            progress = 1.0f
 
-        val completed = progress >= 1f
-        if (completed) detectionLocked = true   // stop taking on new frames immediately
+            runOnUiThread {
+                binding.overlayView.setFrameGeometry(srcW, srcH, boxF)
+                binding.overlayView.setProgress(1.0f, confirmedDet.classIndex >= 0)
+                updateStatus(if (confirmedDet.classIndex >= 0) listOf(confirmedDet) else emptyList())
+                onDetectionComplete(confirmedDet)
+            }
+        } else {
+            val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList())
+            if (activeDets.isNotEmpty()) progress += PROGRESS_STEP else progress -= PROGRESS_DECAY
+            progress = progress.coerceIn(0f, 1f)
 
-        runOnUiThread {
-            binding.overlayView.setFrameGeometry(srcW, srcH, boxF)
-            binding.overlayView.setProgress(progress, dets.isNotEmpty())
-            updateStatus(dets)
-            if (completed) onDetectionComplete(dets.first())
+            runOnUiThread {
+                binding.overlayView.setFrameGeometry(srcW, srcH, boxF)
+                binding.overlayView.setProgress(progress, activeDets.isNotEmpty())
+                updateStatus(activeDets)
+            }
         }
 
         isProcessing = false
@@ -305,6 +339,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateStatus(dets: List<YoloDetector.Detection>) {
         binding.statusText.text = when {
             dets.isEmpty() -> "Hold a toy inside the box"
+            dets[0].classIndex < 0 -> "Unknown object"
             else -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}% — hold steady…"
         }
         binding.statusText.setTextColor(if (dets.isEmpty()) Color.LTGRAY else Color.WHITE)
@@ -318,7 +353,7 @@ class MainActivity : AppCompatActivity() {
         } catch (t: Throwable) {
             Log.e(TAG, "Celebration screen failed — showing fallback text only", t)
             binding.celebrationContainer.visibility = View.VISIBLE
-            binding.celebrationTitle.text = "🎉 ${det.className} found!"
+            binding.celebrationTitle.text = if (det.classIndex < 0) "❓ Unknown object found!" else "🎉 ${det.className} found!"
         }
     }
 
@@ -329,6 +364,12 @@ class MainActivity : AppCompatActivity() {
         binding.overlayView.visibility = View.GONE
         binding.statusText.visibility = View.GONE
         binding.celebrationContainer.visibility = View.VISIBLE
+
+        if (det.classIndex < 0 || det.className == "Unknown") {
+            binding.celebrationTitle.text = "❓ Unknown object found!"
+            modelViewer?.destroyModel()
+            return
+        }
 
         val toy = TOY_ASSETS[det.classIndex]
         binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!"
@@ -368,6 +409,7 @@ class MainActivity : AppCompatActivity() {
         framesSinceLastDet = 0
         candidateClassIndex = -1
         candidateFrameCount = 0
+        attemptFrameCount = 0
         detectionLocked = false
         binding.overlayView.setProgress(0f, false)
         binding.statusText.text = "Point camera at a toy — hold it in the box"
