@@ -18,6 +18,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.madrasmindworks.kinderjoydetector.databinding.ActivityMainBinding
+import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -27,6 +29,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var detector: YoloDetector
     private lateinit var inferenceExecutor: ExecutorService
     private lateinit var cameraProvider: ProcessCameraProvider
+
+    private var modelViewer: ModelViewer? = null
+    private val glbBytesCache = ConcurrentHashMap<String, ByteArray>()
+    private var activeModelClassIndex = -1
 
     // Frame skip — never pile up work
     @Volatile private var isProcessing = false
@@ -63,6 +69,14 @@ class MainActivity : AppCompatActivity() {
     // the user taps "Scan Again". Nothing runs in the background meanwhile.
     @Volatile private var detectionLocked = false
 
+    // classIndex -> GLB asset path
+    private val TOY_GLB_PATHS = mapOf(
+        0 to "models/harry_potter.glb",
+        1 to "models/hermione.glb",
+        2 to "models/batman.glb",
+        3 to "models/flash.glb"
+    )
+
     companion object {
         private const val TAG = "MainActivity"
         private const val REQ_CAMERA = 10
@@ -94,6 +108,23 @@ class MainActivity : AppCompatActivity() {
                 if (hasCameraPermission()) startCamera() else requestCameraPermission()
             }
         }
+
+        preloadGlbAssets()
+    }
+
+    private fun preloadGlbAssets() {
+        Thread({
+            for (path in TOY_GLB_PATHS.values) {
+                try {
+                    glbBytesCache[path] = assets.open(path).readBytes()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to preload $path", e)
+                }
+            }
+            runOnUiThread {
+                modelViewer = ModelViewer(binding.modelSurface)
+            }
+        }, "GlbPreload").start()
     }
 
     // ── Camera ────────────────────────────────────────────────────────────────
@@ -228,6 +259,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList())
+
         if (isConfirmed && confirmedDet != null) {
             detectionLocked = true   // Stop scanning permanently until user resets
             progress = 1.0f
@@ -239,7 +272,6 @@ class MainActivity : AppCompatActivity() {
                 showDetectionResult(confirmedDet)
             }
         } else {
-            val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList())
             if (activeDets.isNotEmpty()) progress += PROGRESS_STEP else progress -= PROGRESS_DECAY
             progress = progress.coerceIn(0f, 1f)
 
@@ -247,10 +279,47 @@ class MainActivity : AppCompatActivity() {
                 binding.overlayView.setFrameGeometry(srcW, srcH, boxF)
                 binding.overlayView.setProgress(progress, activeDets.isNotEmpty())
                 updateStatus(activeDets)
+                updateArOverlay(activeDets, srcW, srcH)
             }
         }
 
         isProcessing = false
+    }
+
+    /**
+     * Renders and locks the 3D GLB model directly over the detected toy's position on the live camera screen.
+     */
+    private fun updateArOverlay(dets: List<YoloDetector.Detection>, frameW: Int, frameH: Int) {
+        val viewer = modelViewer ?: return
+        if (!viewer.isAvailable) return
+
+        if (dets.isEmpty() || dets[0].classIndex < 0) {
+            if (activeModelClassIndex != -1) {
+                viewer.destroyModel()
+                activeModelClassIndex = -1
+            }
+            return
+        }
+
+        val topDet = dets[0]
+
+        // Load 3D model GLB if class changed
+        if (activeModelClassIndex != topDet.classIndex) {
+            val glbPath = TOY_GLB_PATHS[topDet.classIndex]
+            if (glbPath != null) {
+                try {
+                    val bytes = glbBytesCache[glbPath] ?: assets.open(glbPath).readBytes().also { glbBytesCache[glbPath] = it }
+                    viewer.loadGlb(ByteBuffer.wrap(bytes))
+                    viewer.playAnimation(0, loop = true)
+                    activeModelClassIndex = topDet.classIndex
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to load GLB for AR: $glbPath", e)
+                }
+            }
+        }
+
+        // Lock 3D model onto toy bounding box rect on camera overlay
+        viewer.updateModelTransform(topDet.rect, frameW, frameH)
     }
 
     /**
@@ -296,7 +365,7 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = when {
             dets.isEmpty() -> "Hold a toy inside the box"
             dets[0].classIndex < 0 -> "Unknown object"
-            else -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}% — hold steady…"
+            else -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}% — AR Model Locked"
         }
         binding.statusText.setTextColor(if (dets.isEmpty()) Color.LTGRAY else Color.WHITE)
     }
@@ -308,21 +377,26 @@ class MainActivity : AppCompatActivity() {
 
         binding.previewView.visibility = View.GONE
         binding.overlayView.visibility = View.GONE
+        binding.modelSurface.visibility = View.GONE
         binding.statusText.visibility = View.GONE
         binding.resultContainer.visibility = View.VISIBLE
 
         if (det.classIndex < 0 || det.className == "Unknown") {
             binding.resultTitle.text = "Unknown"
         } else {
-            binding.resultTitle.text = det.className
+            binding.resultTitle.text = "${det.className} Confirmed!"
         }
     }
 
     /** "Scan Again" — tears down the result screen and resumes live detection. */
     private fun resetForNewScan() {
+        activeModelClassIndex = -1
+        modelViewer?.destroyModel()
+
         binding.resultContainer.visibility = View.GONE
         binding.previewView.visibility = View.VISIBLE
         binding.overlayView.visibility = View.VISIBLE
+        binding.modelSurface.visibility = View.VISIBLE
         binding.statusText.visibility = View.VISIBLE
 
         progress = 0f
@@ -355,10 +429,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        modelViewer?.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        modelViewer?.onResume()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         inferenceExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
         reusableBitmap?.recycle()
+        modelViewer?.release()
     }
 }
