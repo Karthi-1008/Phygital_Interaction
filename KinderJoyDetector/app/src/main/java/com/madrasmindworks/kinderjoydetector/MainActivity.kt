@@ -259,7 +259,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList())
+        val liveDets = rawDets.filter { it.classIndex >= 0 && calculateCoverage(it.rect, boxF) >= 0.25f }
+        val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (liveDets.isNotEmpty()) liveDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList()))
 
         if (isConfirmed && confirmedDet != null) {
             detectionLocked = true   // Stop scanning permanently until user resets

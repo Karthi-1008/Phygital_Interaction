@@ -45,7 +45,8 @@ class ModelViewer(val surfaceView: SurfaceView) {
     private var loadedAsset: FilamentAsset? = null
     private var animator: Animator? = null
 
-    private var lightEntity: Int = 0
+    private var sunEntity: Int = 0
+    private var fillEntity: Int = 0
     private var isFrameCallbackActive = false
 
     var isAvailable: Boolean = false
@@ -65,7 +66,8 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
     private fun setupFilament() {
         try {
-            surfaceView.setZOrderOnTop(true)
+            // Z-Order Media Overlay keeps 3D model above camera preview surface
+            surfaceView.setZOrderMediaOverlay(true)
             surfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
 
             engine = Engine.create()
@@ -84,7 +86,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
             // Transparent background for AR overlay over camera
             view!!.blendMode = View.BlendMode.TRANSLUCENT
 
-            // Indirect lighting & Sun
+            // Direct + Ambient lighting
             setupLights()
 
             displayHelper = DisplayHelper(surfaceView.context)
@@ -124,15 +126,26 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
     private fun setupLights() {
         val em = engine!!.entityManager
-        lightEntity = em.create()
+
+        // Front main sun light
+        sunEntity = em.create()
+        LightManager.Builder(LightManager.Type.DIRECTIONAL)
+            .color(1.0f, 1.0f, 1.0f)
+            .intensity(120000.0f)
+            .direction(0.0f, -0.5f, -1.0f)
+            .castShadows(false)
+            .build(engine!!, sunEntity)
+        scene?.addEntity(sunEntity)
+
+        // Front-bottom fill light
+        fillEntity = em.create()
         LightManager.Builder(LightManager.Type.DIRECTIONAL)
             .color(1.0f, 0.95f, 0.9f)
-            .intensity(90000.0f)
-            .direction(0.2f, -1.0f, -0.4f)
-            .castShadows(true)
-            .build(engine!!, lightEntity)
-
-        scene?.addEntity(lightEntity)
+            .intensity(60000.0f)
+            .direction(0.0f, 0.5f, -1.0f)
+            .castShadows(false)
+            .build(engine!!, fillEntity)
+        scene?.addEntity(fillEntity)
     }
 
     fun loadGlb(buffer: ByteBuffer) {
@@ -151,7 +164,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
             val center = boundingBox.center
             val halfExtent = boundingBox.halfExtent
             val maxExtent = max(halfExtent[0], max(halfExtent[1], halfExtent[2]))
-            val scaleFactor = if (maxExtent > 0f) 0.6f / maxExtent else 1.0f
+            val scaleFactor = if (maxExtent > 0f) 0.8f / maxExtent else 1.0f
 
             val t1 = createTranslationMat4(-center[0] * scaleFactor, -center[1] * scaleFactor, -center[2] * scaleFactor - 2.5f)
             val s1 = createScaleMat4(scaleFactor, scaleFactor, scaleFactor)
@@ -178,25 +191,27 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
         if (viewW <= 0 || viewH <= 0) return
 
-        // Normalized screen coords (-1.0 to 1.0)
-        val centerX = (rect.centerX() / viewW) * 2.0f - 1.0f
-        val centerY = -((rect.centerY() / viewH) * 2.0f - 1.0f) // invert Y for 3D
+        val aspect = viewW.toFloat() / viewH.toFloat()
+
+        // Normalized screen coords (-1.0 to 1.0) scaled to 3D frustum at Z = -2.5f
+        val centerX = ((rect.centerX() / viewW) * 2.0f - 1.0f) * aspect * 1.05f
+        val centerY = -((rect.centerY() / viewH) * 2.0f - 1.0f) * 1.05f // invert Y for 3D
 
         // Scale based on box size relative to screen
         val boxWidthNorm = rect.width() / viewW
-        val scale = (boxWidthNorm * 2.2f).coerceIn(0.5f, 2.5f)
+        val scale = (boxWidthNorm * 2.8f).coerceIn(0.6f, 3.0f)
 
         // Smooth translation interpolation
-        targetX += (centerX * 0.9f - targetX) * 0.3f
-        targetY += (centerY * 0.9f - targetY) * 0.3f
-        modelScale += (scale - modelScale) * 0.3f
-        rotAngle = (rotAngle + 1.2f) % 360f
+        targetX += (centerX - targetX) * 0.35f
+        targetY += (centerY - targetY) * 0.35f
+        modelScale += (scale - modelScale) * 0.35f
+        rotAngle = (rotAngle + 1.5f) % 360f
 
         val boundingBox = asset.boundingBox
         val center = boundingBox.center
         val halfExtent = boundingBox.halfExtent
         val maxExtent = max(halfExtent[0], max(halfExtent[1], halfExtent[2]))
-        val baseScale = if (maxExtent > 0f) 0.6f / maxExtent else 1.0f
+        val baseScale = if (maxExtent > 0f) 0.8f / maxExtent else 1.0f
 
         val finalScale = baseScale * modelScale
 
@@ -272,11 +287,13 @@ class ModelViewer(val surfaceView: SurfaceView) {
         onPause()
         destroyModel()
 
-        lightEntity.let {
-            if (it != 0) {
-                engine?.destroyEntity(it)
-                engine?.entityManager?.destroy(it)
-            }
+        if (sunEntity != 0) {
+            engine?.destroyEntity(sunEntity)
+            engine?.entityManager?.destroy(sunEntity)
+        }
+        if (fillEntity != 0) {
+            engine?.destroyEntity(fillEntity)
+            engine?.entityManager?.destroy(fillEntity)
         }
 
         assetLoader?.destroy()
