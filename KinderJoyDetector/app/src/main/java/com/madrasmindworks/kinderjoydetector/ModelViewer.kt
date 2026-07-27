@@ -23,9 +23,6 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
     companion object {
         private const val TAG = "ModelViewer"
-        init {
-            Utils.init()
-        }
     }
 
     private val choreographer = Choreographer.getInstance()
@@ -41,6 +38,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
     private var camera: Camera? = null
     private var view: View? = null
     private var renderer: Renderer? = null
+    private var swapChain: SwapChain? = null
     private var uiHelper: UiHelper? = null
     private var displayHelper: DisplayHelper? = null
 
@@ -87,10 +85,6 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
             // Transparent background for AR overlay over camera
             view!!.blendMode = View.BlendMode.TRANSLUCENT
-            val options = view!!.clearOptions
-            options.clear = true
-            options.clearColor = floatArrayOf(0f, 0f, 0f, 0f)
-            view!!.clearOptions = options
 
             // Indirect lighting & Sun
             setupLights()
@@ -99,11 +93,16 @@ class ModelViewer(val surfaceView: SurfaceView) {
             uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK).apply {
                 renderCallback = object : UiHelper.RenderCallback {
                     override fun onNativeWindowChanged(surface: Surface) {
-                        renderer?.setSurface(surface)
+                        swapChain?.let { engine?.destroySwapChain(it) }
+                        swapChain = engine?.createSwapChain(surface)
                     }
 
                     override fun onDetachedFromSurface() {
-                        renderer?.setSurface(null)
+                        swapChain?.let {
+                            engine?.destroySwapChain(it)
+                            engine?.flush()
+                        }
+                        swapChain = null
                     }
 
                     override fun onResized(width: Int, height: Int) {
@@ -217,14 +216,13 @@ class ModelViewer(val surfaceView: SurfaceView) {
         val animIndex = index ?: 0
         if (animIndex < anim.animationCount) {
             anim.applyAnimation(animIndex, 0f)
-            anim.updateBoneTransforms()
         }
     }
 
     private fun render(frameTimeNanos: Long) {
-        val eng = engine ?: return
         val r = renderer ?: return
         val v = view ?: return
+        val sc = swapChain ?: return
 
         if (uiHelper?.isReadyToRender == true) {
             animator?.let { anim ->
@@ -232,11 +230,10 @@ class ModelViewer(val surfaceView: SurfaceView) {
                     val duration = anim.getAnimationDuration(0)
                     val seconds = (frameTimeNanos / 1_000_000_000.0).toFloat()
                     anim.applyAnimation(0, seconds % duration)
-                    anim.updateBoneTransforms()
                 }
             }
 
-            if (r.beginFrame(uiHelper!!.swapChain!!, frameTimeNanos)) {
+            if (r.beginFrame(sc, frameTimeNanos)) {
                 r.render(v)
                 r.endFrame()
             }
@@ -286,9 +283,13 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
         engine?.let { eng ->
             view?.let { eng.destroyView(it) }
-            camera?.let { eng.destroyCamera(it) }
+            camera?.let {
+                eng.destroyCameraComponent(it.entity)
+                eng.entityManager.destroy(it.entity)
+            }
             scene?.let { eng.destroyScene(it) }
             renderer?.let { eng.destroyRenderer(it) }
+            swapChain?.let { eng.destroySwapChain(it) }
             eng.destroy()
         }
 
@@ -297,5 +298,6 @@ class ModelViewer(val surfaceView: SurfaceView) {
         camera = null
         view = null
         renderer = null
+        swapChain = null
     }
 }
