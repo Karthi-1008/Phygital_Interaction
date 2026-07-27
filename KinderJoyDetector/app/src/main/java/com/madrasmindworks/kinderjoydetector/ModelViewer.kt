@@ -12,6 +12,7 @@ import com.google.android.filament.android.UiHelper
 import com.google.android.filament.gltfio.*
 import java.nio.ByteBuffer
 import kotlin.math.max
+import kotlin.math.tan
 
 /**
  * Lightweight Filament 3D Viewer for AR overlay over CameraX preview.
@@ -24,6 +25,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
     }
 
     private val choreographer = Choreographer.getInstance()
+    private var renderFrameCount = 0
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             choreographer.postFrameCallback(this)
@@ -66,19 +68,31 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
     private fun setupFilament() {
         try {
-            // Z-Order Media Overlay keeps 3D model above camera preview surface
-            surfaceView.setZOrderMediaOverlay(true)
+            Log.d(TAG, "Initializing Filament AR Engine...")
+
+            // SurfaceView Z-Order on top to ensure 3D model renders over camera preview
+            surfaceView.setZOrderOnTop(true)
             surfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
 
             engine = Engine.create()
+            Log.d(TAG, "Engine created")
+
             scene = engine!!.createScene()
+            Log.d(TAG, "Scene created")
+
             camera = engine!!.createCamera(engine!!.entityManager.create())
+            Log.d(TAG, "Camera created")
+
             view = engine!!.createView()
+            Log.d(TAG, "View created")
+
             renderer = engine!!.createRenderer()
+            Log.d(TAG, "Renderer created")
 
             val materialProvider = UbershaderProvider(engine!!)
             assetLoader = AssetLoader(engine!!, materialProvider, EntityManager.get())
             resourceLoader = ResourceLoader(engine!!)
+            Log.d(TAG, "AssetLoader and ResourceLoader created")
 
             view!!.scene = scene
             view!!.camera = camera
@@ -93,11 +107,14 @@ class ModelViewer(val surfaceView: SurfaceView) {
             uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK).apply {
                 renderCallback = object : UiHelper.RendererCallback {
                     override fun onNativeWindowChanged(surface: Surface) {
+                        Log.d(TAG, "Native window changed -> Creating SwapChain")
                         swapChain?.let { engine?.destroySwapChain(it) }
                         swapChain = engine?.createSwapChain(surface)
+                        Log.d(TAG, "SwapChain created successfully")
                     }
 
                     override fun onDetachedFromSurface() {
+                        Log.d(TAG, "Detached from surface -> Destroying SwapChain")
                         swapChain?.let {
                             engine?.destroySwapChain(it)
                             engine?.flushAndWait()
@@ -106,6 +123,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
                     }
 
                     override fun onResized(width: Int, height: Int) {
+                        Log.d(TAG, "Surface resized: ${width}x${height}")
                         view?.viewport = Viewport(0, 0, width, height)
                         val aspect = width.toDouble() / height.toDouble()
                         camera?.setProjection(45.0, aspect, 0.1, 100.0, Camera.Fov.VERTICAL)
@@ -116,7 +134,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
             isAvailable = true
             startRendering()
-            Log.i(TAG, "Filament AR Engine initialized successfully")
+            Log.i(TAG, "Filament AR Engine fully initialized and ready")
         } catch (t: Throwable) {
             isAvailable = false
             lastError = t.message
@@ -146,12 +164,18 @@ class ModelViewer(val surfaceView: SurfaceView) {
             .castShadows(false)
             .build(engine!!, fillEntity)
         scene?.addEntity(fillEntity)
+        Log.d(TAG, "Directional & Fill Lights initialized")
     }
 
     fun loadGlb(buffer: ByteBuffer) {
         destroyModel()
         try {
-            val asset = assetLoader?.createAsset(buffer) ?: return
+            Log.d(TAG, "Loading GLB from buffer...")
+            val asset = assetLoader?.createAsset(buffer)
+            if (asset == null) {
+                Log.e(TAG, "GLB failed: assetLoader returned null")
+                return
+            }
             resourceLoader?.loadResources(asset)
             asset.releaseSourceData()
 
@@ -164,9 +188,9 @@ class ModelViewer(val surfaceView: SurfaceView) {
             val center = boundingBox.center
             val halfExtent = boundingBox.halfExtent
             val maxExtent = max(halfExtent[0], max(halfExtent[1], halfExtent[2]))
-            val scaleFactor = if (maxExtent > 0f) 0.8f / maxExtent else 1.0f
+            val scaleFactor = if (maxExtent > 0f) 0.6f / maxExtent else 1.0f
 
-            val t1 = createTranslationMat4(-center[0] * scaleFactor, -center[1] * scaleFactor, -center[2] * scaleFactor - 2.5f)
+            val t1 = createTranslationMat4(-center[0] * scaleFactor, -center[1] * scaleFactor, -center[2] * scaleFactor - 1.4f)
             val s1 = createScaleMat4(scaleFactor, scaleFactor, scaleFactor)
             val transform = multiplyMat4(t1, s1)
 
@@ -174,9 +198,9 @@ class ModelViewer(val surfaceView: SurfaceView) {
             val rootInstance = tm.getInstance(asset.root)
             tm.setTransform(rootInstance, transform)
 
-            Log.i(TAG, "GLB asset loaded into AR scene successfully")
+            Log.i(TAG, "GLB loaded successfully: entity count=${asset.entities.size}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load GLB asset", e)
+            Log.e(TAG, "GLB failed: ${e.message}", e)
         }
     }
 
@@ -193,13 +217,16 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
         val aspect = viewW.toFloat() / viewH.toFloat()
 
-        // Normalized screen coords (-1.0 to 1.0) scaled to 3D frustum at Z = -2.5f
-        val centerX = ((rect.centerX() / viewW) * 2.0f - 1.0f) * aspect * 1.05f
-        val centerY = -((rect.centerY() / viewH) * 2.0f - 1.0f) * 1.05f // invert Y for 3D
+        // FOV-accurate projection mapping to frustum at Z = -1.4f
+        val frustumH = (2.0f * 1.4f * tan(Math.toRadians(22.5))).toFloat() // ~1.16
+        val frustumW = frustumH * aspect
+
+        val centerX = ((rect.centerX() / viewW) - 0.5f) * frustumW
+        val centerY = -((rect.centerY() / viewH) - 0.5f) * frustumH // invert Y for 3D
 
         // Scale based on box size relative to screen
         val boxWidthNorm = rect.width() / viewW
-        val scale = (boxWidthNorm * 2.8f).coerceIn(0.6f, 3.0f)
+        val scale = (boxWidthNorm * 2.2f).coerceIn(0.5f, 2.5f)
 
         // Smooth translation interpolation
         targetX += (centerX - targetX) * 0.35f
@@ -211,11 +238,11 @@ class ModelViewer(val surfaceView: SurfaceView) {
         val center = boundingBox.center
         val halfExtent = boundingBox.halfExtent
         val maxExtent = max(halfExtent[0], max(halfExtent[1], halfExtent[2]))
-        val baseScale = if (maxExtent > 0f) 0.8f / maxExtent else 1.0f
+        val baseScale = if (maxExtent > 0f) 0.6f / maxExtent else 1.0f
 
         val finalScale = baseScale * modelScale
 
-        val t1 = createTranslationMat4(targetX, targetY, -2.5f)
+        val t1 = createTranslationMat4(targetX, targetY, -1.4f)
         val r1 = createRotationYMat4(rotAngle)
         val s1 = createScaleMat4(finalScale, finalScale, finalScale)
         val t2 = createTranslationMat4(-center[0], -center[1], -center[2])
@@ -223,6 +250,10 @@ class ModelViewer(val surfaceView: SurfaceView) {
         val transformMat = multiplyMat4(t1, multiplyMat4(r1, multiplyMat4(s1, t2)))
 
         tm.setTransform(rootInstance, transformMat)
+
+        if (renderFrameCount % 30 == 0) {
+            Log.d(TAG, "Model transform updated: X=${"%.2f".format(targetX)}, Y=${"%.2f".format(targetY)}, scale=${"%.2f".format(modelScale)}")
+        }
     }
 
     fun playAnimation(index: Int?, loop: Boolean = true, onComplete: (() -> Unit)? = null) {
@@ -232,6 +263,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         val animIndex = index ?: 0
         if (animIndex < anim.animationCount) {
             anim.applyAnimation(animIndex, 0f)
+            Log.i(TAG, "Animation started: index=$animIndex, totalCount=${anim.animationCount}")
         }
     }
 
@@ -239,6 +271,11 @@ class ModelViewer(val surfaceView: SurfaceView) {
         val r = renderer ?: return
         val v = view ?: return
         val sc = swapChain ?: return
+
+        renderFrameCount++
+        if (renderFrameCount % 60 == 0) {
+            Log.d(TAG, "render() frame callback running actively ($renderFrameCount frames)")
+        }
 
         if (uiHelper?.isReadyToRender == true) {
             animator?.let { anim ->
@@ -262,6 +299,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
             assetLoader?.destroyAsset(asset)
             loadedAsset = null
             animator = null
+            Log.d(TAG, "Active GLB model destroyed")
         }
     }
 
@@ -269,6 +307,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         if (!isFrameCallbackActive) {
             choreographer.postFrameCallback(frameCallback)
             isFrameCallbackActive = true
+            Log.d(TAG, "Rendering loop started")
         }
     }
 
@@ -276,6 +315,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         if (isFrameCallbackActive) {
             choreographer.removeFrameCallback(frameCallback)
             isFrameCallbackActive = false
+            Log.d(TAG, "Rendering loop paused")
         }
     }
 
@@ -317,6 +357,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         view = null
         renderer = null
         swapChain = null
+        Log.i(TAG, "Filament AR Engine released")
     }
 
     // ── 4x4 Matrix Math Helpers ──────────────────────────────────────────────

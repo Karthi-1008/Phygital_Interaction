@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private var modelViewer: ModelViewer? = null
     private val glbBytesCache = ConcurrentHashMap<String, ByteArray>()
     private var activeModelClassIndex = -1
+    private var lockedClassIndex = -1
 
     // Frame skip — never pile up work
     @Volatile private var isProcessing = false
@@ -48,7 +49,7 @@ class MainActivity : AppCompatActivity() {
     // frame comes back empty/borderline, so the box doesn't flicker.
     private var lastDets: List<YoloDetector.Detection> = emptyList()
     private var framesSinceLastDet = 0
-    private val HOLD_FRAMES = 4
+    private val HOLD_FRAMES = 6
 
     // Multi-frame temporal stability tracking & 60% confidence confirmation
     private var candidateClassIndex = -1
@@ -65,8 +66,8 @@ class MainActivity : AppCompatActivity() {
     private val PROGRESS_STEP = 0.055f   // ~ fills in well under 2s at typical FPS
     private val PROGRESS_DECAY = 0.09f
 
-    // Once true, all further frame processing / camera analysis stops until
-    // the user taps "Scan Again". Nothing runs in the background meanwhile.
+    // Locks model selection (toy type) upon 3 stable confirmations,
+    // but frame tracking & AR rendering loop continue running every frame!
     @Volatile private var detectionLocked = false
 
     // classIndex -> GLB asset path
@@ -116,9 +117,12 @@ class MainActivity : AppCompatActivity() {
         Thread({
             for (path in TOY_GLB_PATHS.values) {
                 try {
-                    glbBytesCache[path] = assets.open(path).readBytes()
+                    Log.d(TAG, "Preloading GLB asset: $path...")
+                    val bytes = assets.open(path).readBytes()
+                    glbBytesCache[path] = bytes
+                    Log.i(TAG, "Preloaded GLB asset successfully: $path (${bytes.size} bytes)")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to preload $path", e)
+                    Log.e(TAG, "GLB failed to preload: $path", e)
                 }
             }
             runOnUiThread {
@@ -149,6 +153,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                Log.i(TAG, "Camera bound successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Camera bind failed", e)
             }
@@ -175,7 +180,7 @@ class MainActivity : AppCompatActivity() {
     // ── Frame processing ──────────────────────────────────────────────────────
 
     private fun processFrame(image: ImageProxy) {
-        if (isProcessing || detectionLocked) { image.close(); return }
+        if (isProcessing) { image.close(); return }
         isProcessing = true
 
         val bmp = imageProxyToBitmap(image)
@@ -207,63 +212,82 @@ class MainActivity : AppCompatActivity() {
         val confirmedDet: YoloDetector.Detection?
         val isConfirmed: Boolean
 
-        if (highConfInBoxDets.isNotEmpty()) {
-            val topDet = highConfInBoxDets.maxByOrNull { it.confidence }!!
-            if (topDet.classIndex == candidateClassIndex) {
-                candidateFrameCount++
-            } else {
-                candidateClassIndex = topDet.classIndex
-                candidateFrameCount = 1
-            }
-            attemptFrameCount++
+        if (!detectionLocked) {
+            if (highConfInBoxDets.isNotEmpty()) {
+                val topDet = highConfInBoxDets.maxByOrNull { it.confidence }!!
+                if (topDet.classIndex == candidateClassIndex) {
+                    candidateFrameCount++
+                } else {
+                    candidateClassIndex = topDet.classIndex
+                    candidateFrameCount = 1
+                }
+                attemptFrameCount++
 
-            // Rule: 60%+ confidence for 3 continuous frames -> CONFIRM TOY (no more scanning/checks!)
-            if (candidateFrameCount >= REQUIRED_STABLE_FRAMES) {
-                confirmedDet = topDet
-                isConfirmed = true
+                // Rule: 60%+ confidence for 3 continuous frames -> CONFIRM TOY
+                if (candidateFrameCount >= REQUIRED_STABLE_FRAMES) {
+                    confirmedDet = topDet
+                    isConfirmed = true
+                    lockedClassIndex = topDet.classIndex
+                    Log.i(TAG, "Toy confirmed (3 stable detections): ${topDet.className} (${topDet.confidence * 100}%)")
+                } else {
+                    confirmedDet = null
+                    isConfirmed = false
+                    lastDets = highConfInBoxDets
+                    framesSinceLastDet = 0
+                }
             } else {
-                confirmedDet = null
-                isConfirmed = false
-                lastDets = highConfInBoxDets
-                framesSinceLastDet = 0
+                val hasObjectInBox = rawDets.any { calculateCoverage(it.rect, boxF) >= 0.20f }
+                if (hasObjectInBox) {
+                    attemptFrameCount++
+                } else {
+                    attemptFrameCount = (attemptFrameCount - 1).coerceAtLeast(0)
+                }
+
+                candidateClassIndex = -1
+                candidateFrameCount = 0
+
+                if (attemptFrameCount >= UNKNOWN_TIMEOUT_FRAMES) {
+                    confirmedDet = YoloDetector.Detection(
+                        rect = boxF,
+                        classIndex = -1,
+                        className = "Unknown",
+                        confidence = 0f
+                    )
+                    isConfirmed = true
+                    lockedClassIndex = -1
+                    Log.i(TAG, "Unknown object confirmed after timeout")
+                } else {
+                    confirmedDet = null
+                    isConfirmed = false
+                    if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
+                        framesSinceLastDet++
+                    } else {
+                        lastDets = emptyList()
+                    }
+                }
             }
         } else {
-            // Check if ANY object is held inside the guide box (even low confidence or un-recognized)
-            val hasObjectInBox = rawDets.any { calculateCoverage(it.rect, boxF) >= 0.20f }
-            if (hasObjectInBox) {
-                attemptFrameCount++
+            // Detection selection is locked — keep tracking live detections for position/scale!
+            confirmedDet = null
+            isConfirmed = false
+            if (highConfInBoxDets.isNotEmpty()) {
+                lastDets = highConfInBoxDets
+                framesSinceLastDet = 0
+            } else if (rawDets.isNotEmpty()) {
+                lastDets = rawDets
+                framesSinceLastDet = 0
+            } else if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
+                framesSinceLastDet++
             } else {
-                attemptFrameCount = (attemptFrameCount - 1).coerceAtLeast(0)
-            }
-
-            candidateClassIndex = -1
-            candidateFrameCount = 0
-
-            // Else Condition: If an object is held in the box but fails to reach 60% confidence x 3 continuous frames -> Confirm Unknown!
-            if (attemptFrameCount >= UNKNOWN_TIMEOUT_FRAMES) {
-                confirmedDet = YoloDetector.Detection(
-                    rect = boxF,
-                    classIndex = -1,
-                    className = "Unknown",
-                    confidence = 0f
-                )
-                isConfirmed = true
-            } else {
-                confirmedDet = null
-                isConfirmed = false
-                if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
-                    framesSinceLastDet++
-                } else {
-                    lastDets = emptyList()
-                }
+                lastDets = emptyList()
             }
         }
 
-        val liveDets = rawDets.filter { it.classIndex >= 0 && calculateCoverage(it.rect, boxF) >= 0.25f }
+        val liveDets = rawDets.filter { it.classIndex >= 0 && calculateCoverage(it.rect, boxF) >= 0.20f }
         val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (liveDets.isNotEmpty()) liveDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList()))
 
         if (isConfirmed && confirmedDet != null) {
-            detectionLocked = true   // Stop scanning permanently until user resets
+            detectionLocked = true   // Lock toy type selection, BUT AR loop continues!
             progress = 1.0f
 
             runOnUiThread {
@@ -271,6 +295,7 @@ class MainActivity : AppCompatActivity() {
                 binding.overlayView.setProgress(1.0f, confirmedDet.classIndex >= 0)
                 updateStatus(if (confirmedDet.classIndex >= 0) listOf(confirmedDet) else emptyList())
                 showDetectionResult(confirmedDet)
+                updateArOverlay(listOf(confirmedDet), srcW, srcH)
             }
         } else {
             if (activeDets.isNotEmpty()) progress += PROGRESS_STEP else progress -= PROGRESS_DECAY
@@ -289,42 +314,68 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Renders and locks the 3D GLB model directly over the detected toy's position on the live camera screen.
+     * Supports both Portrait and Landscape camera preview orientations.
      */
     private fun updateArOverlay(dets: List<YoloDetector.Detection>, frameW: Int, frameH: Int) {
         val viewer = modelViewer ?: return
         if (!viewer.isAvailable) return
 
-        if (dets.isEmpty() || dets[0].classIndex < 0) {
+        val targetClassIndex = if (detectionLocked) lockedClassIndex else (if (dets.isNotEmpty()) dets[0].classIndex else activeModelClassIndex)
+
+        if (targetClassIndex < 0) {
             if (activeModelClassIndex != -1) {
                 viewer.destroyModel()
                 activeModelClassIndex = -1
+                Log.d(TAG, "AR Overlay: Destroyed active model (no valid target)")
             }
             return
         }
 
-        val topDet = dets[0]
-
         // Load 3D model GLB if class changed
-        if (activeModelClassIndex != topDet.classIndex) {
-            val glbPath = TOY_GLB_PATHS[topDet.classIndex]
+        if (activeModelClassIndex != targetClassIndex) {
+            val glbPath = TOY_GLB_PATHS[targetClassIndex]
             if (glbPath != null) {
                 try {
+                    Log.d(TAG, "Loading GLB: $glbPath...")
                     val bytes = glbBytesCache[glbPath] ?: assets.open(glbPath).readBytes().also { glbBytesCache[glbPath] = it }
                     viewer.loadGlb(ByteBuffer.wrap(bytes))
                     viewer.playAnimation(0, loop = true)
-                    activeModelClassIndex = topDet.classIndex
+                    activeModelClassIndex = targetClassIndex
+                    Log.i(TAG, "GLB loaded successfully & animation started: $glbPath")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to load GLB for AR: $glbPath", e)
+                    Log.e(TAG, "GLB failed: $glbPath - ${e.message}", e)
                 }
             }
         }
 
-        // Lock 3D model onto toy bounding box rect on camera overlay
-        viewer.updateModelTransform(topDet.rect, frameW, frameH)
+        // Determine effective view size (modelSurface or previewView)
+        val viewW = binding.modelSurface.width.takeIf { it > 0 } ?: binding.previewView.width.takeIf { it > 0 } ?: frameW
+        val viewH = binding.modelSurface.height.takeIf { it > 0 } ?: binding.previewView.height.takeIf { it > 0 } ?: frameH
+
+        // Aspect-ratio & Orientation coordinate conversion (Portrait & Landscape fitCenter scaling)
+        val targetRect = if (dets.isNotEmpty()) dets[0].rect else (if (lastDets.isNotEmpty()) lastDets[0].rect else guideBoxFrame)
+
+        if (targetRect != null) {
+            val scaleX = viewW.toFloat() / frameW
+            val scaleY = viewH.toFloat() / frameH
+            val scale  = minOf(scaleX, scaleY)
+            val offsetX = (viewW - frameW * scale) / 2f
+            val offsetY = (viewH - frameH * scale) / 2f
+
+            val screenRect = RectF(
+                targetRect.left * scale + offsetX,
+                targetRect.top * scale + offsetY,
+                targetRect.right * scale + offsetX,
+                targetRect.bottom * scale + offsetY
+            )
+
+            // Lock 3D model onto toy bounding box rect on camera overlay
+            viewer.updateModelTransform(screenRect, viewW, viewH)
+        }
     }
 
     /**
-     * Goal 2: Coverage calculation = IntersectionArea(prediction, guideBox) / PredictionArea
+     * Coverage calculation = IntersectionArea(prediction, guideBox) / PredictionArea
      */
     private fun calculateCoverage(pred: RectF, guideBox: RectF): Float {
         val ix1 = maxOf(pred.left, guideBox.left)
@@ -374,24 +425,21 @@ class MainActivity : AppCompatActivity() {
     // ── Detection Result Display ──────────────────────────────────────────────
 
     private fun showDetectionResult(det: YoloDetector.Detection) {
-        stopCamera()   // Stop camera and analyzer immediately
-
-        binding.previewView.visibility = View.GONE
-        binding.overlayView.visibility = View.GONE
-        binding.modelSurface.visibility = View.GONE
-        binding.statusText.visibility = View.GONE
+        // Display floating bottom banner — DOES NOT stop camera preview or hide modelSurface!
         binding.resultContainer.visibility = View.VISIBLE
 
         if (det.classIndex < 0 || det.className == "Unknown") {
-            binding.resultTitle.text = "Unknown"
+            binding.resultTitle.text = "Unknown Object"
         } else {
             binding.resultTitle.text = "${det.className} Confirmed!"
         }
     }
 
-    /** "Scan Again" — tears down the result screen and resumes live detection. */
+    /** "Scan Again" — unlocks detection and resets for a new scan. */
     private fun resetForNewScan() {
+        Log.d(TAG, "Resetting for new scan...")
         activeModelClassIndex = -1
+        lockedClassIndex = -1
         modelViewer?.destroyModel()
 
         binding.resultContainer.visibility = View.GONE
@@ -409,8 +457,6 @@ class MainActivity : AppCompatActivity() {
         detectionLocked = false
         binding.overlayView.setProgress(0f, false)
         binding.statusText.text = "Point camera at a toy — hold it in the box"
-
-        startCamera()
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
@@ -442,6 +488,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopCamera()
         inferenceExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
         reusableBitmap?.recycle()
