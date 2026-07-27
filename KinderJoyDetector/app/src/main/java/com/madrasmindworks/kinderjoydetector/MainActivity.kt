@@ -28,13 +28,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var inferenceExecutor: ExecutorService
     private lateinit var cameraProvider: ProcessCameraProvider
 
-    private var modelViewer: ModelViewer? = null
-
-    // Preloaded once at startup so the celebration screen never waits on
-    // disk I/O — asset reads (~1-2MB each) happen in the background while
-    // the user is still scanning, not at the exciting moment.
-    private val glbBytesCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
-
     // Frame skip — never pile up work
     @Volatile private var isProcessing = false
 
@@ -51,7 +44,7 @@ class MainActivity : AppCompatActivity() {
     private var framesSinceLastDet = 0
     private val HOLD_FRAMES = 4
 
-    // Multi-frame temporal stability tracking & 60% confidence confirmation (Goal 3 & User Request)
+    // Multi-frame temporal stability tracking & 60% confidence confirmation
     private var candidateClassIndex = -1
     private var candidateFrameCount = 0
     private var attemptFrameCount = 0
@@ -69,15 +62,6 @@ class MainActivity : AppCompatActivity() {
     // Once true, all further frame processing / camera analysis stops until
     // the user taps "Scan Again". Nothing runs in the background meanwhile.
     @Volatile private var detectionLocked = false
-
-    // className index -> celebration asset info
-    private data class ToyAsset(val assetPath: String, val animationIndex: Int?, val emoji: String)
-    private val TOY_ASSETS = mapOf(
-        0 to ToyAsset("models/harry_potter.glb", null, "🧙"),   // no embedded animation — shown as a static pose
-        1 to ToyAsset("models/hermione.glb", 0, "🪄"),           // "metarig|idle"
-        2 to ToyAsset("models/batman.glb", 0, "🦇"),             // "Armature|...mixamo"
-        3 to ToyAsset("models/flash.glb", 10, "⚡")              // "waveHello" — celebratory
-    )
 
     companion object {
         private const val TAG = "MainActivity"
@@ -110,34 +94,6 @@ class MainActivity : AppCompatActivity() {
                 if (hasCameraPermission()) startCamera() else requestCameraPermission()
             }
         }
-
-        preloadCelebrationAssets()
-    }
-
-    /**
-     * Reads every .glb into memory and warms up the Filament engine (which
-     * compiles its ubershader materials on first use) in the background,
-     * well before the user ever completes a detection — so the celebration
-     * screen has nothing left to do but call loadGlb() on already-loaded
-     * bytes, instead of hitting disk + shader compilation right when it
-     * needs to feel instant.
-     */
-    private fun preloadCelebrationAssets() {
-        Thread({
-            for (toy in TOY_ASSETS.values) {
-                try {
-                    glbBytesCache[toy.assetPath] = assets.open(toy.assetPath).readBytes()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Preload failed for ${toy.assetPath}", e)
-                }
-            }
-            runOnUiThread {
-                // Created on the UI thread (SurfaceHolder callbacks require it),
-                // but all the expensive one-time setup (shader/material
-                // compilation) happens now instead of at celebration time.
-                modelViewer = ModelViewer(binding.modelSurface)
-            }
-        }, "GlbPreload").start()
     }
 
     // ── Camera ────────────────────────────────────────────────────────────────
@@ -252,7 +208,7 @@ class MainActivity : AppCompatActivity() {
             candidateClassIndex = -1
             candidateFrameCount = 0
 
-            // Else Condition: If an object is held in the box but fails to reach 60% confidence x 3 continuous frames
+            // Else Condition: If an object is held in the box but fails to reach 60% confidence x 3 continuous frames -> Confirm Unknown!
             if (attemptFrameCount >= UNKNOWN_TIMEOUT_FRAMES) {
                 confirmedDet = YoloDetector.Detection(
                     rect = boxF,
@@ -280,7 +236,7 @@ class MainActivity : AppCompatActivity() {
                 binding.overlayView.setFrameGeometry(srcW, srcH, boxF)
                 binding.overlayView.setProgress(1.0f, confirmedDet.classIndex >= 0)
                 updateStatus(if (confirmedDet.classIndex >= 0) listOf(confirmedDet) else emptyList())
-                onDetectionComplete(confirmedDet)
+                showDetectionResult(confirmedDet)
             }
         } else {
             val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList())
@@ -345,61 +301,26 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.setTextColor(if (dets.isEmpty()) Color.LTGRAY else Color.WHITE)
     }
 
-    // ── Success → celebration ────────────────────────────────────────────────
+    // ── Detection Result Display ──────────────────────────────────────────────
 
-    private fun onDetectionComplete(det: YoloDetector.Detection) {
-        try {
-            onDetectionCompleteInternal(det)
-        } catch (t: Throwable) {
-            Log.e(TAG, "Celebration screen failed — showing fallback text only", t)
-            binding.celebrationContainer.visibility = View.VISIBLE
-            binding.celebrationTitle.text = if (det.classIndex < 0) "❓ Unknown object found!" else "🎉 ${det.className} found!"
-        }
-    }
-
-    private fun onDetectionCompleteInternal(det: YoloDetector.Detection) {
-        stopCamera()   // no background camera/inference work while celebrating
+    private fun showDetectionResult(det: YoloDetector.Detection) {
+        stopCamera()   // Stop camera and analyzer immediately
 
         binding.previewView.visibility = View.GONE
         binding.overlayView.visibility = View.GONE
         binding.statusText.visibility = View.GONE
-        binding.celebrationContainer.visibility = View.VISIBLE
+        binding.resultContainer.visibility = View.VISIBLE
 
         if (det.classIndex < 0 || det.className == "Unknown") {
-            binding.celebrationTitle.text = "❓ Unknown object found!"
-            modelViewer?.destroyModel()
-            return
-        }
-
-        val toy = TOY_ASSETS[det.classIndex]
-        binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!"
-
-        val viewer = modelViewer ?: ModelViewer(binding.modelSurface).also { modelViewer = it }
-        if (!viewer.isAvailable) {
-            // 3D isn't available on this device
-            Log.w(TAG, "ModelViewer unavailable: ${viewer.lastError}")
-            binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!\n(3D preview unavailable on this device)"
-            return
-        }
-        if (toy != null) {
-            try {
-                val bytes = glbBytesCache[toy.assetPath] ?: assets.open(toy.assetPath).readBytes()
-                    .also { glbBytesCache[toy.assetPath] = it }
-                viewer.loadGlb(java.nio.ByteBuffer.wrap(bytes))
-                viewer.playAnimation(toy.animationIndex, loop = toy.animationIndex == null) {
-                    runOnUiThread { viewer.playAnimation(toy.animationIndex, loop = true) }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load ${toy.assetPath}", e)
-            }
+            binding.resultTitle.text = "Unknown"
+        } else {
+            binding.resultTitle.text = det.className
         }
     }
 
-    /** "Scan Again" — tears down the celebration and resumes live detection. */
+    /** "Scan Again" — tears down the result screen and resumes live detection. */
     private fun resetForNewScan() {
-        modelViewer?.destroyModel()
-
-        binding.celebrationContainer.visibility = View.GONE
+        binding.resultContainer.visibility = View.GONE
         binding.previewView.visibility = View.VISIBLE
         binding.overlayView.visibility = View.VISIBLE
         binding.statusText.visibility = View.VISIBLE
@@ -439,6 +360,5 @@ class MainActivity : AppCompatActivity() {
         inferenceExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
         reusableBitmap?.recycle()
-        modelViewer?.release()
     }
 }

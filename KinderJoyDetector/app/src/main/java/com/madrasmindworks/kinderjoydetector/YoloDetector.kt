@@ -33,12 +33,12 @@ class YoloDetector(private val context: Context) {
 
         val CLASS_NAMES = arrayOf("Harry Potter", "Hermione Granger", "Batman", "Flash")
 
-        // Per-class thresholds — lower for classes that under-detect
+        // Per-class thresholds
         val CLASS_THRESHOLDS = floatArrayOf(
-            0.30f,   // Harry Potter   — was missing detections, lowered
-            0.40f,   // Hermione       — good detection, keep moderate
-            0.28f,   // Batman         — dark toy, harder to detect, lowered more
-            0.38f    // Flash          — good detection
+            0.35f,   // Harry Potter
+            0.40f,   // Hermione
+            0.45f,   // Batman         — raised to prevent shape-only color-mismatched false positives
+            0.38f    // Flash
         )
 
         private const val IOU_THRESHOLD = 0.40f   // NMS threshold

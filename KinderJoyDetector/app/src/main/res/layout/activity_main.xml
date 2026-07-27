@@ -59,15 +59,13 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- ══════════════════ Celebration screen (shown on success) ══════════════════
-         Fully replaces the camera UI while the .glb animation plays — camera +
-         inference are unbound/stopped for this whole screen, per requirement
-         that no background scanning runs while the celebration plays. -->
+    <!-- ══════════════════ Result screen (shown on detection completion) ══════════════════ -->
     <LinearLayout
-        android:id="@+id/celebrationContainer"
+        android:id="@+id/resultContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="vertical"
+        android:gravity="center"
         android:background="#0F0A1F"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="parent"
@@ -76,26 +74,17 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
-            android:id="@+id/celebrationTitle"
+            android:id="@+id/resultTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="28dp"
-            android:paddingBottom="8dp"
+            android:paddingBottom="28dp"
             android:paddingHorizontal="16dp"
-            android:text="🎉 Found it!"
+            android:text="Detection Result"
             android:textAlignment="center"
             android:textColor="#FFFFFF"
-            android:textSize="26sp"
+            android:textSize="28sp"
             android:textStyle="bold" />
-
-        <!-- The .glb model renders into this surface, auto-fit to a unit cube
-             by ModelViewer.kt so it looks consistent on any screen size. -->
-        <SurfaceView
-            android:id="@+id/modelSurface"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="8dp" />
 
         <Button
             android:id="@+id/btnScanAgain"
