@@ -15,7 +15,7 @@ import kotlin.math.max
 import kotlin.math.tan
 
 /**
- * Lightweight Filament 3D Viewer for AR overlay over CameraX preview.
+ * Fully instrumented Filament 3D Viewer for AR overlay over CameraX preview.
  * Supports Android 8.0 (API 26) through Android 15 (API 35+).
  */
 class ModelViewer(val surfaceView: SurfaceView) {
@@ -68,37 +68,39 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
     private fun setupFilament() {
         try {
-            Log.d(TAG, "Initializing Filament AR Engine...")
+            Log.d(TAG, "[AR-DIAG] Initializing Filament AR Engine...")
 
             // SurfaceView Z-Order on top to ensure 3D model renders over camera preview
             surfaceView.setZOrderOnTop(true)
             surfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
+            Log.d(TAG, "[AR-DIAG] SurfaceView configuration: setZOrderOnTop(true), PixelFormat.TRANSLUCENT")
 
             engine = Engine.create()
-            Log.d(TAG, "Engine created")
+            Log.d(TAG, "[AR-DIAG] Engine created successfully: $engine")
 
             scene = engine!!.createScene()
-            Log.d(TAG, "Scene created")
+            Log.d(TAG, "[AR-DIAG] Scene created successfully: $scene")
 
             camera = engine!!.createCamera(engine!!.entityManager.create())
-            Log.d(TAG, "Camera created")
+            Log.d(TAG, "[AR-DIAG] Camera created successfully: $camera")
 
             view = engine!!.createView()
-            Log.d(TAG, "View created")
+            Log.d(TAG, "[AR-DIAG] View created successfully: $view")
 
             renderer = engine!!.createRenderer()
-            Log.d(TAG, "Renderer created")
+            Log.d(TAG, "[AR-DIAG] Renderer created successfully: $renderer")
 
             val materialProvider = UbershaderProvider(engine!!)
             assetLoader = AssetLoader(engine!!, materialProvider, EntityManager.get())
             resourceLoader = ResourceLoader(engine!!)
-            Log.d(TAG, "AssetLoader and ResourceLoader created")
+            Log.d(TAG, "[AR-DIAG] AssetLoader & ResourceLoader created successfully")
 
             view!!.scene = scene
             view!!.camera = camera
 
             // Transparent background for AR overlay over camera
             view!!.blendMode = View.BlendMode.TRANSLUCENT
+            Log.d(TAG, "[AR-DIAG] View blendMode set to View.BlendMode.TRANSLUCENT")
 
             // Direct + Ambient lighting
             setupLights()
@@ -107,14 +109,14 @@ class ModelViewer(val surfaceView: SurfaceView) {
             uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK).apply {
                 renderCallback = object : UiHelper.RendererCallback {
                     override fun onNativeWindowChanged(surface: Surface) {
-                        Log.d(TAG, "Native window changed -> Creating SwapChain")
+                        Log.d(TAG, "[AR-DIAG] Native window changed -> Creating SwapChain for surface $surface")
                         swapChain?.let { engine?.destroySwapChain(it) }
                         swapChain = engine?.createSwapChain(surface)
-                        Log.d(TAG, "SwapChain created successfully")
+                        Log.d(TAG, "[AR-DIAG] SwapChain created successfully: $swapChain")
                     }
 
                     override fun onDetachedFromSurface() {
-                        Log.d(TAG, "Detached from surface -> Destroying SwapChain")
+                        Log.d(TAG, "[AR-DIAG] Detached from surface -> Destroying SwapChain")
                         swapChain?.let {
                             engine?.destroySwapChain(it)
                             engine?.flushAndWait()
@@ -123,10 +125,11 @@ class ModelViewer(val surfaceView: SurfaceView) {
                     }
 
                     override fun onResized(width: Int, height: Int) {
-                        Log.d(TAG, "Surface resized: ${width}x${height}")
+                        val aspect = if (height > 0) width.toDouble() / height.toDouble() else 1.0
+                        Log.d(TAG, "[AR-DIAG] Viewport resized: ${width}x${height}, aspect=${"%.2f".format(aspect)}")
                         view?.viewport = Viewport(0, 0, width, height)
-                        val aspect = width.toDouble() / height.toDouble()
                         camera?.setProjection(45.0, aspect, 0.1, 100.0, Camera.Fov.VERTICAL)
+                        Log.d(TAG, "[AR-DIAG] Camera Projection Matrix updated: FOV=45.0, aspect=${"%.2f".format(aspect)}, near=0.1, far=100.0")
                     }
                 }
                 attachTo(surfaceView)
@@ -134,11 +137,11 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
             isAvailable = true
             startRendering()
-            Log.i(TAG, "Filament AR Engine fully initialized and ready")
+            Log.i(TAG, "[AR-DIAG] Filament AR Engine fully initialized and ready")
         } catch (t: Throwable) {
             isAvailable = false
             lastError = t.message
-            Log.e(TAG, "Filament initialization failed", t)
+            Log.e(TAG, "[AR-DIAG] Filament initialization failed", t)
         }
     }
 
@@ -164,22 +167,25 @@ class ModelViewer(val surfaceView: SurfaceView) {
             .castShadows(false)
             .build(engine!!, fillEntity)
         scene?.addEntity(fillEntity)
-        Log.d(TAG, "Directional & Fill Lights initialized")
+        Log.d(TAG, "[AR-DIAG] Directional Sun & Fill Lights added to Scene")
     }
 
     fun loadGlb(buffer: ByteBuffer) {
         destroyModel()
         try {
-            Log.d(TAG, "Loading GLB from buffer...")
+            Log.d(TAG, "[AR-DIAG] Loading GLB... buffer capacity=${buffer.capacity()} bytes")
             val asset = assetLoader?.createAsset(buffer)
             if (asset == null) {
-                Log.e(TAG, "GLB failed: assetLoader returned null")
+                Log.e(TAG, "[AR-DIAG] GLB failed: AssetLoader.createAsset returned null")
                 return
             }
             resourceLoader?.loadResources(asset)
             asset.releaseSourceData()
 
+            val countBefore = scene?.entityCount ?: 0
             scene?.addEntities(asset.entities)
+            val countAfter = scene?.entityCount ?: 0
+
             loadedAsset = asset
             animator = asset.instance.animator
 
@@ -198,16 +204,16 @@ class ModelViewer(val surfaceView: SurfaceView) {
             val rootInstance = tm.getInstance(asset.root)
             tm.setTransform(rootInstance, transform)
 
-            Log.i(TAG, "GLB loaded successfully: entity count=${asset.entities.size}")
+            Log.i(TAG, "[AR-DIAG] GLB Loaded Successfully! Root entity=${asset.root}, entitiesCount=${asset.entities.size}, SceneEntityCount: $countBefore -> $countAfter")
         } catch (e: Exception) {
-            Log.e(TAG, "GLB failed: ${e.message}", e)
+            Log.e(TAG, "[AR-DIAG] GLB failed: ${e.message}", e)
         }
     }
 
     /**
      * Updates model AR position ($x, y$, scale) to lock directly over the detected toy bounding box in screen coordinates.
      */
-    fun updateModelTransform(rect: RectF, viewW: Int, viewH: Int) {
+    fun updateModelTransform(screenRect: RectF, viewW: Int, viewH: Int) {
         val asset = loadedAsset ?: return
         val tm = engine?.transformManager ?: return
         val rootInstance = tm.getInstance(asset.root)
@@ -217,18 +223,21 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
         val aspect = viewW.toFloat() / viewH.toFloat()
 
-        // FOV-accurate projection mapping to frustum at Z = -1.4f
-        val frustumH = (2.0f * 1.4f * tan(Math.toRadians(22.5))).toFloat() // ~1.16
+        // FOV-accurate projection mapping to frustum at Z = -1.4f (vertical FOV = 45°)
+        val frustumH = (2.0f * 1.4f * tan(Math.toRadians(22.5))).toFloat() // ~1.1598f
         val frustumW = frustumH * aspect
 
-        val centerX = ((rect.centerX() / viewW) - 0.5f) * frustumW
-        val centerY = -((rect.centerY() / viewH) - 0.5f) * frustumH // invert Y for 3D
+        val normX = (screenRect.centerX() / viewW.toFloat()).coerceIn(0f, 1f)
+        val normY = (screenRect.centerY() / viewH.toFloat()).coerceIn(0f, 1f)
+
+        val centerX = (normX - 0.5f) * frustumW
+        val centerY = -(normY - 0.5f) * frustumH // invert Y for 3D
 
         // Scale based on box size relative to screen
-        val boxWidthNorm = rect.width() / viewW
+        val boxWidthNorm = screenRect.width() / viewW.toFloat()
         val scale = (boxWidthNorm * 2.2f).coerceIn(0.5f, 2.5f)
 
-        // Smooth translation interpolation
+        // Smooth translation & rotation interpolation
         targetX += (centerX - targetX) * 0.35f
         targetY += (centerY - targetY) * 0.35f
         modelScale += (scale - modelScale) * 0.35f
@@ -252,7 +261,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         tm.setTransform(rootInstance, transformMat)
 
         if (renderFrameCount % 30 == 0) {
-            Log.d(TAG, "Model transform updated: X=${"%.2f".format(targetX)}, Y=${"%.2f".format(targetY)}, scale=${"%.2f".format(modelScale)}")
+            Log.d(TAG, "[AR-DIAG] World Transform: screenCenter=(${screenRect.centerX().toInt()}, ${screenRect.centerY().toInt()}), targetX=${"%.2f".format(targetX)}, targetY=${"%.2f".format(targetY)}, targetZ=-1.4, scale=${"%.2f".format(modelScale)}")
         }
     }
 
@@ -263,7 +272,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         val animIndex = index ?: 0
         if (animIndex < anim.animationCount) {
             anim.applyAnimation(animIndex, 0f)
-            Log.i(TAG, "Animation started: index=$animIndex, totalCount=${anim.animationCount}")
+            Log.i(TAG, "[AR-DIAG] Animation Started: animIndex=$animIndex, totalAnimCount=${anim.animationCount}")
         }
     }
 
@@ -274,7 +283,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
         renderFrameCount++
         if (renderFrameCount % 60 == 0) {
-            Log.d(TAG, "render() frame callback running actively ($renderFrameCount frames)")
+            Log.d(TAG, "[AR-DIAG] Render Loop Running: frame=$renderFrameCount, isReadyToRender=${uiHelper?.isReadyToRender}, swapChainNotNull=${swapChain != null}")
         }
 
         if (uiHelper?.isReadyToRender == true) {
@@ -295,11 +304,13 @@ class ModelViewer(val surfaceView: SurfaceView) {
 
     fun destroyModel() {
         loadedAsset?.let { asset ->
+            val countBefore = scene?.entityCount ?: 0
             scene?.removeEntities(asset.entities)
+            val countAfter = scene?.entityCount ?: 0
             assetLoader?.destroyAsset(asset)
             loadedAsset = null
             animator = null
-            Log.d(TAG, "Active GLB model destroyed")
+            Log.d(TAG, "[AR-DIAG] Active GLB model destroyed: SceneEntityCount $countBefore -> $countAfter")
         }
     }
 
@@ -307,7 +318,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         if (!isFrameCallbackActive) {
             choreographer.postFrameCallback(frameCallback)
             isFrameCallbackActive = true
-            Log.d(TAG, "Rendering loop started")
+            Log.d(TAG, "[AR-DIAG] Render Loop Started via Choreographer")
         }
     }
 
@@ -315,7 +326,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         if (isFrameCallbackActive) {
             choreographer.removeFrameCallback(frameCallback)
             isFrameCallbackActive = false
-            Log.d(TAG, "Rendering loop paused")
+            Log.d(TAG, "[AR-DIAG] Render Loop Paused")
         }
     }
 
@@ -357,7 +368,7 @@ class ModelViewer(val surfaceView: SurfaceView) {
         view = null
         renderer = null
         swapChain = null
-        Log.i(TAG, "Filament AR Engine released")
+        Log.i(TAG, "[AR-DIAG] Filament AR Engine fully released")
     }
 
     // ── 4x4 Matrix Math Helpers ──────────────────────────────────────────────

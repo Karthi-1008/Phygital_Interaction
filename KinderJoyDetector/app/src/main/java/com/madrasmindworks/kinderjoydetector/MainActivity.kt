@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.madrasmindworks.kinderjoydetector.databinding.ActivityMainBinding
@@ -117,15 +118,16 @@ class MainActivity : AppCompatActivity() {
         Thread({
             for (path in TOY_GLB_PATHS.values) {
                 try {
-                    Log.d(TAG, "Preloading GLB asset: $path...")
+                    Log.d(TAG, "[AR-DIAG] Preloading GLB asset: $path...")
                     val bytes = assets.open(path).readBytes()
                     glbBytesCache[path] = bytes
-                    Log.i(TAG, "Preloaded GLB asset successfully: $path (${bytes.size} bytes)")
+                    Log.i(TAG, "[AR-DIAG] Preloaded GLB asset successfully: $path (${bytes.size} bytes)")
                 } catch (e: Exception) {
-                    Log.e(TAG, "GLB failed to preload: $path", e)
+                    Log.e(TAG, "[AR-DIAG] GLB failed to preload: $path", e)
                 }
             }
             runOnUiThread {
+                Log.d(TAG, "[AR-DIAG] Creating ModelViewer instance on UI thread...")
                 modelViewer = ModelViewer(binding.modelSurface)
             }
         }, "GlbPreload").start()
@@ -137,6 +139,11 @@ class MainActivity : AppCompatActivity() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
             cameraProvider = future.get()
+
+            // Force COMPATIBLE implementation mode (TextureView) for camera preview
+            // so hardware SurfaceView modelSurface sits cleanly ON TOP of camera preview!
+            binding.previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            Log.d(TAG, "[AR-DIAG] PreviewView implementationMode set to COMPATIBLE (TextureView)")
 
             val preview = Preview.Builder()
                 .setTargetResolution(Size(360, 480))   // Fast & crisp on older phones
@@ -153,9 +160,9 @@ class MainActivity : AppCompatActivity() {
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
-                Log.i(TAG, "Camera bound successfully")
+                Log.i(TAG, "[AR-DIAG] Camera Ready: Size(360, 480)")
             } catch (e: Exception) {
-                Log.e(TAG, "Camera bind failed", e)
+                Log.e(TAG, "[AR-DIAG] Camera bind failed", e)
             }
         }, ContextCompat.getMainExecutor(this))
     }
@@ -175,6 +182,7 @@ class MainActivity : AppCompatActivity() {
         val top  = (frameH - size) / 2f
         guideBoxFrame = RectF(left, top, left + size, top + size)
         guideBoxRect = Rect(left.toInt(), top.toInt(), (left + size).toInt(), (top + size).toInt())
+        Log.d(TAG, "[AR-DIAG] Guide box initialized: frameSize=(${frameW}x${frameH}), boxRect=${guideBoxRect}")
     }
 
     // ── Frame processing ──────────────────────────────────────────────────────
@@ -228,7 +236,7 @@ class MainActivity : AppCompatActivity() {
                     confirmedDet = topDet
                     isConfirmed = true
                     lockedClassIndex = topDet.classIndex
-                    Log.i(TAG, "Toy confirmed (3 stable detections): ${topDet.className} (${topDet.confidence * 100}%)")
+                    Log.i(TAG, "[AR-DIAG] Detection Confirmed (3 stable frames): class=${topDet.classIndex} (${topDet.className}), conf=${"%.1f".format(topDet.confidence * 100)}%")
                 } else {
                     confirmedDet = null
                     isConfirmed = false
@@ -255,7 +263,7 @@ class MainActivity : AppCompatActivity() {
                     )
                     isConfirmed = true
                     lockedClassIndex = -1
-                    Log.i(TAG, "Unknown object confirmed after timeout")
+                    Log.i(TAG, "[AR-DIAG] Detection Confirmed: Unknown object (timeout)")
                 } else {
                     confirmedDet = null
                     isConfirmed = false
@@ -317,8 +325,14 @@ class MainActivity : AppCompatActivity() {
      * Supports both Portrait and Landscape camera preview orientations.
      */
     private fun updateArOverlay(dets: List<YoloDetector.Detection>, frameW: Int, frameH: Int) {
-        val viewer = modelViewer ?: return
-        if (!viewer.isAvailable) return
+        val viewer = modelViewer ?: run {
+            Log.w(TAG, "[AR-DIAG] updateArOverlay skipped: modelViewer is null")
+            return
+        }
+        if (!viewer.isAvailable) {
+            Log.w(TAG, "[AR-DIAG] updateArOverlay skipped: modelViewer.isAvailable is false (error=${viewer.lastError})")
+            return
+        }
 
         val targetClassIndex = if (detectionLocked) lockedClassIndex else (if (dets.isNotEmpty()) dets[0].classIndex else activeModelClassIndex)
 
@@ -326,7 +340,7 @@ class MainActivity : AppCompatActivity() {
             if (activeModelClassIndex != -1) {
                 viewer.destroyModel()
                 activeModelClassIndex = -1
-                Log.d(TAG, "AR Overlay: Destroyed active model (no valid target)")
+                Log.d(TAG, "[AR-DIAG] AR Overlay: Destroyed active model (no target class)")
             }
             return
         }
@@ -336,14 +350,15 @@ class MainActivity : AppCompatActivity() {
             val glbPath = TOY_GLB_PATHS[targetClassIndex]
             if (glbPath != null) {
                 try {
-                    Log.d(TAG, "Loading GLB: $glbPath...")
+                    Log.d(TAG, "[AR-DIAG] Select GLB: classIndex=$targetClassIndex -> path=$glbPath...")
                     val bytes = glbBytesCache[glbPath] ?: assets.open(glbPath).readBytes().also { glbBytesCache[glbPath] = it }
+                    Log.d(TAG, "[AR-DIAG] GLB Bytes retrieved: ${bytes.size} bytes")
                     viewer.loadGlb(ByteBuffer.wrap(bytes))
                     viewer.playAnimation(0, loop = true)
                     activeModelClassIndex = targetClassIndex
-                    Log.i(TAG, "GLB loaded successfully & animation started: $glbPath")
+                    Log.i(TAG, "[AR-DIAG] GLB Loaded & Animation Started Successfully: $glbPath")
                 } catch (e: Exception) {
-                    Log.e(TAG, "GLB failed: $glbPath - ${e.message}", e)
+                    Log.e(TAG, "[AR-DIAG] GLB Failed to load: $glbPath - ${e.message}", e)
                 }
             }
         }
@@ -437,7 +452,7 @@ class MainActivity : AppCompatActivity() {
 
     /** "Scan Again" — unlocks detection and resets for a new scan. */
     private fun resetForNewScan() {
-        Log.d(TAG, "Resetting for new scan...")
+        Log.d(TAG, "[AR-DIAG] Resetting for new scan...")
         activeModelClassIndex = -1
         lockedClassIndex = -1
         modelViewer?.destroyModel()
