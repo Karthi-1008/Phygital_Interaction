@@ -51,6 +51,12 @@ class MainActivity : AppCompatActivity() {
     private var framesSinceLastDet = 0
     private val HOLD_FRAMES = 4
 
+    // Multi-frame temporal stability tracking (Goal 3) & Coverage threshold (Goal 2)
+    private var candidateClassIndex = -1
+    private var candidateFrameCount = 0
+    private val REQUIRED_STABLE_FRAMES = 2
+    private val MIN_COVERAGE = 0.50f
+
     // "Hold the toy in the box" progress — fills while a confident detection
     // sits inside the guide box, decays when it doesn't.
     private var progress = 0f
@@ -200,26 +206,47 @@ class MainActivity : AppCompatActivity() {
             (box.bottom + margin).coerceAtMost(srcH)
         )
 
-        val rawDets = detector.detect(bmp, cropRect)
-
-        // Only detections that substantially overlap the guide box count —
-        // a toy peeking in at the edge of the crop margin shouldn't register.
-        val inBoxDets = rawDets.filter { iou(it.rect, boxF) > 0.30f }
-
-        // Temporal smoothing
-        val dets: List<YoloDetector.Detection>
-        if (inBoxDets.isNotEmpty()) {
-            dets = inBoxDets
-            lastDets = inBoxDets
-            framesSinceLastDet = 0
-        } else if (framesSinceLastDet < HOLD_FRAMES) {
-            dets = lastDets
-            framesSinceLastDet++
-        } else {
-            dets = emptyList()
+        // Goal 1 & Adaptive Rotation: early exit if detection satisfies confidence + coverage >= 50%
+        val rawDets = detector.detect(bmp, cropRect) { rect, _, _ ->
+            calculateCoverage(rect, boxF) >= MIN_COVERAGE
         }
 
-        // Progress: fill while something valid is held in the box, decay otherwise
+        // Goal 2: Filter detections requiring coverage >= 50% inside guide box
+        val inBoxDets = rawDets.filter { calculateCoverage(it.rect, boxF) >= MIN_COVERAGE }
+
+        // Goal 3: Multi-frame temporal stability filtering (reject single-frame flicker)
+        val dets: List<YoloDetector.Detection>
+        if (inBoxDets.isNotEmpty()) {
+            val topDet = inBoxDets.maxByOrNull { it.confidence }!!
+            if (topDet.classIndex == candidateClassIndex) {
+                candidateFrameCount++
+            } else {
+                candidateClassIndex = topDet.classIndex
+                candidateFrameCount = 1
+            }
+
+            if (candidateFrameCount >= REQUIRED_STABLE_FRAMES) {
+                dets = inBoxDets
+                lastDets = inBoxDets
+                framesSinceLastDet = 0
+            } else if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
+                dets = lastDets
+                framesSinceLastDet++
+            } else {
+                dets = emptyList()
+            }
+        } else {
+            candidateClassIndex = -1
+            candidateFrameCount = 0
+            if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
+                dets = lastDets
+                framesSinceLastDet++
+            } else {
+                dets = emptyList()
+            }
+        }
+
+        // Progress: fill while a stable valid detection is held in the box, decay otherwise
         if (dets.isNotEmpty()) progress += PROGRESS_STEP else progress -= PROGRESS_DECAY
         progress = progress.coerceIn(0f, 1f)
 
@@ -236,21 +263,24 @@ class MainActivity : AppCompatActivity() {
         isProcessing = false
     }
 
-    private fun iou(a: RectF, b: RectF): Float {
-        val ix1 = maxOf(a.left, b.left);   val iy1 = maxOf(a.top, b.top)
-        val ix2 = minOf(a.right, b.right); val iy2 = minOf(a.bottom, b.bottom)
-        val iw = maxOf(0f, ix2 - ix1);     val ih = maxOf(0f, iy2 - iy1)
+    /**
+     * Goal 2: Coverage calculation = IntersectionArea(prediction, guideBox) / PredictionArea
+     */
+    private fun calculateCoverage(pred: RectF, guideBox: RectF): Float {
+        val ix1 = maxOf(pred.left, guideBox.left)
+        val iy1 = maxOf(pred.top, guideBox.top)
+        val ix2 = minOf(pred.right, guideBox.right)
+        val iy2 = minOf(pred.bottom, guideBox.bottom)
+        val iw = maxOf(0f, ix2 - ix1)
+        val ih = maxOf(0f, iy2 - iy1)
         val inter = iw * ih
-        if (inter == 0f) return 0f
-        // Overlap relative to the smaller of the two areas — a toy fully inside
-        // the box scores ~1.0 even if the box itself is much bigger than it.
-        val smaller = minOf((a.right - a.left) * (a.bottom - a.top), (b.right - b.left) * (b.bottom - b.top))
-        return if (smaller <= 0f) 0f else inter / smaller
+        val predArea = (pred.right - pred.left) * (pred.bottom - pred.top)
+        if (predArea <= 0f) return 0f
+        return inter / predArea
     }
 
     /**
-     * Reuses a single ARGB_8888 Bitmap across frames instead of allocating a
-     * new one every frame.
+     * Reuses a single ARGB_8888 Bitmap across frames — zero allocations when rowPad > 0.
      */
     private fun imageProxyToBitmap(img: ImageProxy): Bitmap {
         val plane      = img.planes[0]
@@ -267,8 +297,7 @@ class MainActivity : AppCompatActivity() {
         }
         bmp.copyPixelsFromBuffer(plane.buffer)
 
-        return if (rowPad == 0) bmp
-        else Bitmap.createBitmap(bmp, 0, 0, img.width, img.height)
+        return bmp
     }
 
     // ── Status text ───────────────────────────────────────────────────────────
@@ -306,9 +335,7 @@ class MainActivity : AppCompatActivity() {
 
         val viewer = modelViewer ?: ModelViewer(binding.modelSurface).also { modelViewer = it }
         if (!viewer.isAvailable) {
-            // 3D isn't available on this device (e.g. no OpenGL ES 3 support,
-            // or a native lib mismatch) — fail soft: keep the celebration
-            // text/emoji and "Scan Again" working instead of crashing.
+            // 3D isn't available on this device
             Log.w(TAG, "ModelViewer unavailable: ${viewer.lastError}")
             binding.celebrationTitle.text = "${toy?.emoji ?: "🎉"} ${det.className} found!\n(3D preview unavailable on this device)"
             return
@@ -316,11 +343,9 @@ class MainActivity : AppCompatActivity() {
         if (toy != null) {
             try {
                 val bytes = glbBytesCache[toy.assetPath] ?: assets.open(toy.assetPath).readBytes()
-                    .also { glbBytesCache[toy.assetPath] = it }   // fallback if preload hadn't finished yet
+                    .also { glbBytesCache[toy.assetPath] = it }
                 viewer.loadGlb(java.nio.ByteBuffer.wrap(bytes))
                 viewer.playAnimation(toy.animationIndex, loop = toy.animationIndex == null) {
-                    // Animation finished once — loop it gently so the screen
-                    // doesn't look frozen while the user decides to scan again.
                     runOnUiThread { viewer.playAnimation(toy.animationIndex, loop = true) }
                 }
             } catch (e: Exception) {
@@ -341,6 +366,8 @@ class MainActivity : AppCompatActivity() {
         progress = 0f
         lastDets = emptyList()
         framesSinceLastDet = 0
+        candidateClassIndex = -1
+        candidateFrameCount = 0
         detectionLocked = false
         binding.overlayView.setProgress(0f, false)
         binding.statusText.text = "Point camera at a toy — hold it in the box"

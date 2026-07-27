@@ -3,21 +3,17 @@ package com.madrasmindworks.kinderjoydetector
 import ai.onnxruntime.*
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.graphics.RectF
 import android.util.Log
-import ai.onnxruntime.TensorInfo
 import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * YOLO11n ONNX detector — optimised for accuracy + speed.
- *
- * Key fixes vs v1:
- *  • Per-class confidence thresholds (Harry Potter & Batman need lower threshold)
- *  • Proper letterbox inverse mapping (eliminates box drift)
- *  • Reuse pre-allocated RGB buffer — no per-frame GC
- *  • Multi-label output: reports ALL classes above threshold in one pass
+ * YOLO11n ONNX detector — optimized for accuracy + speed.
+ * Supports zero-allocation inference, adaptive rotation augmentation (0°, 90°, 270°, 180°),
+ * inverse box transformation, and single-pass NMS.
  */
 class YoloDetector(private val context: Context) {
 
@@ -32,29 +28,20 @@ class YoloDetector(private val context: Context) {
         private const val TAG = "YoloDetector"
         private const val MODEL_FILE = "exp-3.onnx"
 
-        // Preferred input size when the model graph allows a dynamic input
-        // shape (smaller tensor = less resize work + fewer FLOPs = faster on
-        // low-end phones). exp-3.onnx is currently exported with a FIXED
-        // 640x640 input, so this only takes effect if/when the model is
-        // re-exported with dynamic H/W axes — detectInputSize() below reads
-        // the graph's actual shape at load time and falls back to 640
-        // automatically, so this is always safe to leave enabled.
         private const val PREFERRED_DYNAMIC_INPUT_SIZE = 320
         private const val FALLBACK_INPUT_SIZE = 640
 
-        // Model class order from metadata
         val CLASS_NAMES = arrayOf("Harry Potter", "Hermione Granger", "Batman", "Flash")
 
         // Per-class thresholds — lower for classes that under-detect
-        // Harry Potter & Batman need lower thresholds because they're harder to distinguish
-        private val CLASS_THRESHOLDS = floatArrayOf(
+        val CLASS_THRESHOLDS = floatArrayOf(
             0.30f,   // Harry Potter   — was missing detections, lowered
             0.40f,   // Hermione       — good detection, keep moderate
             0.28f,   // Batman         — dark toy, harder to detect, lowered more
             0.38f    // Flash          — good detection
         )
 
-        private const val IOU_THRESHOLD = 0.40f   // tighter NMS = fewer duplicate boxes
+        private const val IOU_THRESHOLD = 0.40f   // NMS threshold
 
         val CLASS_COLORS = intArrayOf(
             0xFF_FF6B35.toInt(),   // Harry Potter  — orange
@@ -64,20 +51,24 @@ class YoloDetector(private val context: Context) {
         )
     }
 
+    /**
+     * Configuration toggle for rotation augmentation.
+     * Set to false to disable rotation inference and run 0° only.
+     */
+    var enableRotationAugmentation: Boolean = true
+
     private var ortEnv: OrtEnvironment? = null
     private var ortSession: OrtSession? = null
     var isLoaded = false
         private set
 
-    // Resolved once at load() from the model's own graph metadata — see
-    // detectInputSize(). Not a compile-time constant any more.
     var inputSize = FALLBACK_INPUT_SIZE
         private set
 
-    // Pre-allocated — zero GC per frame. Sized once inputSize is known.
+    // Pre-allocated FloatArray for normalized planar NCHW input — zero GC per frame
     private lateinit var inputBuffer: FloatArray
 
-    // Reusable source-pixel buffer, resized only if camera resolution changes
+    // Reusable cropped source pixel array — resized only if crop dimensions change
     private var srcPixels = IntArray(0)
     private var srcPixelsW = 0
     private var srcPixelsH = 0
@@ -86,37 +77,27 @@ class YoloDetector(private val context: Context) {
     fun load() {
         try {
             ortEnv = OrtEnvironment.getEnvironment()
-
             val cores = Runtime.getRuntime().availableProcessors().coerceIn(2, 8)
 
             val opts = OrtSession.SessionOptions().apply {
                 setIntraOpNumThreads(cores)
-                setInterOpNumThreads(1)                 // single graph, no parallel branches to gain from >1
+                setInterOpNumThreads(1)                 // single graph
                 setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
                 setMemoryPatternOptimization(true)
                 setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
 
-                // XNNPACK first: for a small conv-only YOLO graph like this, a
-                // fully-CPU XNNPACK EP is consistently faster and more
-                // predictable than NNAPI. NNAPI only helps when the WHOLE
-                // graph maps onto vendor NPU/DSP/GPU ops — this model's opset
-                // (20) has ops NNAPI's delegate can't cover, so it silently
-                // partitions the graph between NNAPI and CPU and pays a
-                // device<->CPU tensor-copy tax at every boundary EVERY frame.
-                // That per-frame copy overhead — not thread count — is why
-                // "NNAPI enabled" still showed up slow in the field.
                 var accelerated = false
                 try {
                     addXnnpack(mapOf("intra_op_num_threads" to cores.toString()))
                     Log.i(TAG, "XNNPACK enabled, $cores threads")
                     accelerated = true
                 } catch (e: Exception) {
-                    Log.w(TAG, "XNNPACK unavailable in this ORT build: ${e.message}")
+                    Log.w(TAG, "XNNPACK unavailable: ${e.message}")
                 }
                 if (!accelerated) {
                     try {
                         addNnapi()
-                        Log.i(TAG, "NNAPI enabled (XNNPACK unavailable), $cores threads")
+                        Log.i(TAG, "NNAPI enabled, $cores threads")
                     } catch (e: Exception) {
                         Log.w(TAG, "CPU fallback: ${e.message}")
                     }
@@ -131,39 +112,19 @@ class YoloDetector(private val context: Context) {
 
             isLoaded = true
             Log.i(TAG, "Model loaded — ${CLASS_NAMES.size} classes, input=${inputSize}x$inputSize")
-            if (inputSize > PREFERRED_DYNAMIC_INPUT_SIZE) {
-                // This is the real speed ceiling: exp-3.onnx's graph.input is
-                // hard-coded [1,3,640,640] (confirmed via onnx.load()), so no
-                // amount of thread/EP tuning here can make inference do 320x320
-                // worth of work — it will always do the full 640x640 FLOPs.
-                // Real fix is re-exporting the model, e.g. from Ultralytics:
-                //   yolo export model=best.pt format=onnx imgsz=320 dynamic=False opset=17
-                // (dynamic=True also works and lets this class pick 320
-                // automatically via PREFERRED_DYNAMIC_INPUT_SIZE above).
-                Log.w(TAG, "exp-3.onnx has a FIXED ${inputSize}x$inputSize input — " +
-                        "re-export at imgsz=$PREFERRED_DYNAMIC_INPUT_SIZE for the real speedup; " +
-                        "no on-device setting can shrink a fixed graph input.")
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Model load failed", e)
         }
     }
 
-    /**
-     * Reads the model's actual input tensor shape (NCHW) to decide what
-     * square size we should resize/letterbox into. If the graph declares a
-     * concrete H/W (the normal case for exp-3.onnx, fixed at 640) we must use
-     * exactly that value. If the graph instead declares a dynamic axis (-1),
-     * we're free to pick a smaller size for speed.
-     */
     private fun detectInputSize(session: OrtSession): Int {
         return try {
             val inputInfo = session.inputInfo.values.first().info as TensorInfo
-            val shape = inputInfo.shape   // [N, C, H, W]
+            val shape = inputInfo.shape
             val h = if (shape.size >= 3) shape[2] else -1L
             when {
-                h > 0 -> h.toInt()                       // fixed shape — must match exactly
-                else  -> PREFERRED_DYNAMIC_INPUT_SIZE    // dynamic — pick the fast option
+                h > 0 -> h.toInt()
+                else  -> PREFERRED_DYNAMIC_INPUT_SIZE
             }
         } catch (e: Exception) {
             Log.w(TAG, "Could not read input shape, defaulting to $FALLBACK_INPUT_SIZE", e)
@@ -172,54 +133,67 @@ class YoloDetector(private val context: Context) {
     }
 
     /**
-     * Run detection on the region of [bitmap] inside [cropRect] (full bitmap
-     * if null). Returned detections are in ORIGINAL [bitmap] pixel coordinates
-     * (the crop offset is already added back in), so callers never have to
-     * think about the crop again.
-     *
-     * Cropping to the on-screen guide box before inference means the model
-     * only ever has to reason about the region the user is actually pointing
-     * at — less background clutter for it to reject, and less source-pixel
-     * area to read per frame.
+     * Run detection on the region of [bitmap] inside [cropRect].
+     * Uses direct zero-allocation pixel buffer extraction + adaptive rotation inference.
+     * Optional [isValidDet] callback allows early termination if a candidate detection
+     * satisfies all constraints (confidence + coverage >= 50%).
      */
-    fun detect(bitmap: Bitmap, cropRect: android.graphics.Rect? = null): List<Detection> {
+    fun detect(
+        bitmap: Bitmap,
+        cropRect: Rect? = null,
+        isValidDet: ((RectF, Int, Float) -> Boolean)? = null
+    ): List<Detection> {
         if (!isLoaded) return emptyList()
 
-        val cropLeft: Int
-        val cropTop: Int
-        val srcBitmap: Bitmap
-        if (cropRect != null) {
-            cropLeft = cropRect.left
-            cropTop = cropRect.top
-            // Cheap: createBitmap(Bitmap, l, t, w, h) shares the same pixel
-            // buffer when no rotation/matrix is applied — no pixel copy here.
-            srcBitmap = Bitmap.createBitmap(bitmap, cropRect.left, cropRect.top, cropRect.width(), cropRect.height())
-        } else {
-            cropLeft = 0
-            cropTop = 0
-            srcBitmap = bitmap
+        val cropLeft = (cropRect?.left ?: 0).coerceIn(0, bitmap.width - 1)
+        val cropTop  = (cropRect?.top ?: 0).coerceIn(0, bitmap.height - 1)
+        val cropW    = (cropRect?.width() ?: bitmap.width).coerceIn(1, bitmap.width - cropLeft)
+        val cropH    = (cropRect?.height() ?: bitmap.height).coerceIn(1, bitmap.height - cropTop)
+
+        // Read source pixels directly into reusable IntArray — ZERO Bitmap allocations
+        if (srcPixelsW != cropW || srcPixelsH != cropH) {
+            srcPixels = IntArray(cropW * cropH)
+            srcPixelsW = cropW
+            srcPixelsH = cropH
+        }
+        bitmap.getPixels(srcPixels, 0, cropW, cropLeft, cropTop, cropW, cropH)
+
+        val rotationAngles = if (enableRotationAugmentation) intArrayOf(0, 90, 270, 180) else intArrayOf(0)
+        val allDets = mutableListOf<Detection>()
+
+        for (angle in rotationAngles) {
+            val dets = runInferenceForRotation(angle, cropW, cropH, cropLeft, cropTop)
+            if (dets.isNotEmpty()) {
+                allDets.addAll(dets)
+                // Adaptive early exit: if any detection at this rotation angle is valid (passes coverage & threshold),
+                // stop trying further rotations!
+                val hasValid = isValidDet != null && dets.any { isValidDet(it.rect, it.classIndex, it.confidence) }
+                if (hasValid || isValidDet == null) {
+                    break
+                }
+            }
         }
 
-        return runInference(srcBitmap, cropLeft, cropTop)
+        return nms(allDets)
     }
 
-    private fun runInference(bitmap: Bitmap, cropLeft: Int, cropTop: Int): List<Detection> {
-        val origW = bitmap.width
-        val origH = bitmap.height
+    private fun runInferenceForRotation(
+        angle: Int,
+        cropW: Int,
+        cropH: Int,
+        cropLeft: Int,
+        cropTop: Int
+    ): List<Detection> {
         val INPUT_SIZE = inputSize
 
-        // Resize source-pixel buffer only when camera resolution actually changes
-        if (srcPixelsW != origW || srcPixelsH != origH) {
-            srcPixels = IntArray(origW * origH)
-            srcPixelsW = origW
-            srcPixelsH = origH
-        }
-        bitmap.getPixels(srcPixels, 0, origW, 0, 0, origW, origH)
+        // Rotated crop dimensions
+        val rotW = if (angle == 90 || angle == 270) cropH else cropW
+        val rotH = if (angle == 90 || angle == 270) cropW else cropH
 
-        // 1. Letterbox geometry (kept aspect ratio, matches OverlayView math)
-        val scale    = min(INPUT_SIZE / origW.toFloat(), INPUT_SIZE / origH.toFloat())
-        val newW     = (origW * scale).toInt().coerceAtLeast(1)
-        val newH     = (origH * scale).toInt().coerceAtLeast(1)
+        // 1. Letterbox geometry for rotW x rotH into INPUT_SIZE x INPUT_SIZE
+        val scale    = min(INPUT_SIZE / rotW.toFloat(), INPUT_SIZE / rotH.toFloat())
+        val newW     = (rotW * scale).toInt().coerceAtLeast(1)
+        val newH     = (rotH * scale).toInt().coerceAtLeast(1)
         val padLeft  = (INPUT_SIZE - newW) / 2
         val padTop   = (INPUT_SIZE - newH) / 2
 
@@ -228,13 +202,13 @@ class YoloDetector(private val context: Context) {
         val bOff = 2 * INPUT_SIZE * INPUT_SIZE
         val padVal = 114f / 255f
 
-        // 2. Direct nearest-neighbour resize + letterbox straight into the
-        //    normalised planar float tensor — zero extra allocations, zero Bitmaps.
+        // 2. Direct pixel extraction with rotation into pre-allocated inputBuffer
         for (y in 0 until INPUT_SIZE) {
             val srcY = y - padTop
             val rowIsPad = srcY < 0 || srcY >= newH
-            val sy = if (rowIsPad) 0 else (srcY * origH / newH).coerceIn(0, origH - 1)
+            val ry = if (rowIsPad) 0 else (srcY * rotH / newH).coerceIn(0, rotH - 1)
             val rowBase = y * INPUT_SIZE
+
             for (x in 0 until INPUT_SIZE) {
                 val srcX = x - padLeft
                 if (rowIsPad || srcX < 0 || srcX >= newW) {
@@ -242,8 +216,38 @@ class YoloDetector(private val context: Context) {
                     inputBuffer[gOff + rowBase + x] = padVal
                     inputBuffer[bOff + rowBase + x] = padVal
                 } else {
-                    val sx = (srcX * origW / newW).coerceIn(0, origW - 1)
-                    val px = srcPixels[sy * origW + sx]
+                    val rx = (srcX * rotW / newW).coerceIn(0, rotW - 1)
+
+                    // Map (rx, ry) in rotated crop to (sx, sy) in unrotated srcPixels
+                    val sx: Int
+                    val sy: Int
+                    when (angle) {
+                        0 -> {
+                            sx = rx
+                            sy = ry
+                        }
+                        90 -> { // 90° CW
+                            sx = ry
+                            sy = cropH - 1 - rx
+                        }
+                        180 -> { // 180°
+                            sx = cropW - 1 - rx
+                            sy = cropH - 1 - ry
+                        }
+                        270 -> { // 270° CW
+                            sx = cropW - 1 - ry
+                            sy = rx
+                        }
+                        else -> {
+                            sx = rx
+                            sy = ry
+                        }
+                    }
+
+                    val safeSx = sx.coerceIn(0, cropW - 1)
+                    val safeSy = sy.coerceIn(0, cropH - 1)
+                    val px = srcPixels[safeSy * cropW + safeSx]
+
                     inputBuffer[rOff + rowBase + x] = ((px shr 16) and 0xFF) * (1f / 255f)
                     inputBuffer[gOff + rowBase + x] = ((px shr  8) and 0xFF) * (1f / 255f)
                     inputBuffer[bOff + rowBase + x] = ( px         and 0xFF) * (1f / 255f)
@@ -251,33 +255,31 @@ class YoloDetector(private val context: Context) {
             }
         }
 
-        val padLeftF = padLeft.toFloat()
-        val padTopF  = padTop.toFloat()
-
-        // 3. Inference
+        // 3. ONNX Inference
         val shape  = longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong())
         val tensor = OnnxTensor.createTensor(ortEnv, FloatBuffer.wrap(inputBuffer), shape)
         val t0 = System.nanoTime()
         val result = ortSession!!.run(mapOf("images" to tensor))
         val inferMs = (System.nanoTime() - t0) / 1_000_000f
         tensor.close()
-        // Throttled so it doesn't spam logcat — one line per ~15 frames is
-        // enough to watch the trend while testing an EP/model change.
-        if (++frameCounter % 15 == 0) Log.d(TAG, "inference: ${"%.1f".format(inferMs)}ms")
 
-        // 4. Parse [1, 4+numClass, numAnchors] → each anchor: [cx,cy,w,h, s0..sN]
-        //    numAnchors is read from the actual output tensor rather than a
-        //    hardcoded 8400, so this keeps working if inputSize ever changes
-        //    (anchor count scales with input resolution: 640→8400, 320→2100).
+        if (++frameCounter % 15 == 0) {
+            Log.d(TAG, "rot=$angle° inference: ${"%.1f".format(inferMs)}ms")
+        }
+
+        // 4. Parse output and map bounding boxes back to unrotated full image coordinates
         val raw       = (result[0].value as Array<*>)[0] as Array<*>
         val numClass  = CLASS_NAMES.size
         val numAnch   = (raw[4] as FloatArray).size
         val dets      = mutableListOf<Detection>()
         val cropLeftF = cropLeft.toFloat()
         val cropTopF  = cropTop.toFloat()
+        val padLeftF  = padLeft.toFloat()
+        val padTopF   = padTop.toFloat()
+        val cropWF    = cropW.toFloat()
+        val cropHF    = cropH.toFloat()
 
         for (a in 0 until numAnch) {
-            // Best class score
             var bestScore = -1f
             var bestCls   = 0
             for (c in 0 until numClass) {
@@ -285,24 +287,60 @@ class YoloDetector(private val context: Context) {
                 if (s > bestScore) { bestScore = s; bestCls = c }
             }
 
-            // Per-class threshold check
             if (bestScore < CLASS_THRESHOLDS[bestCls]) continue
 
-            // 640-space cx,cy,w,h  →  original image pixel coords
             val cx = (raw[0] as FloatArray)[a]
             val cy = (raw[1] as FloatArray)[a]
             val w  = (raw[2] as FloatArray)[a]
             val h  = (raw[3] as FloatArray)[a]
 
-            val x1 = ((cx - w * 0.5f) - padLeftF) / scale
-            val y1 = ((cy - h * 0.5f) - padTopF)  / scale
-            val x2 = ((cx + w * 0.5f) - padLeftF) / scale
-            val y2 = ((cy + h * 0.5f) - padTopF)  / scale
+            // Unletterbox to rotated crop coordinates (rx1, ry1, rx2, ry2)
+            val rx1 = (((cx - w * 0.5f) - padLeftF) / scale).coerceIn(0f, rotW.toFloat())
+            val ry1 = (((cy - h * 0.5f) - padTopF)  / scale).coerceIn(0f, rotH.toFloat())
+            val rx2 = (((cx + w * 0.5f) - padLeftF) / scale).coerceIn(0f, rotW.toFloat())
+            val ry2 = (((cy + h * 0.5f) - padTopF)  / scale).coerceIn(0f, rotH.toFloat())
+
+            // Inverse box transformation from rotated crop to unrotated crop coordinates
+            val x1: Float
+            val y1: Float
+            val x2: Float
+            val y2: Float
+            when (angle) {
+                0 -> {
+                    x1 = rx1
+                    y1 = ry1
+                    x2 = rx2
+                    y2 = ry2
+                }
+                90 -> {
+                    x1 = ry1
+                    y1 = cropHF - rx2
+                    x2 = ry2
+                    y2 = cropHF - rx1
+                }
+                180 -> {
+                    x1 = cropWF - rx2
+                    y1 = cropHF - ry2
+                    x2 = cropWF - rx1
+                    y2 = cropHF - ry1
+                }
+                270 -> {
+                    x1 = cropWF - ry2
+                    y1 = rx1
+                    x2 = cropWF - ry1
+                    y2 = rx2
+                }
+                else -> {
+                    x1 = rx1; y1 = ry1; x2 = rx2; y2 = ry2
+                }
+            }
 
             dets.add(Detection(
-                rect       = RectF(
-                    x1.coerceIn(0f, origW.toFloat()) + cropLeftF, y1.coerceIn(0f, origH.toFloat()) + cropTopF,
-                    x2.coerceIn(0f, origW.toFloat()) + cropLeftF, y2.coerceIn(0f, origH.toFloat()) + cropTopF
+                rect = RectF(
+                    x1.coerceIn(0f, cropWF) + cropLeftF,
+                    y1.coerceIn(0f, cropHF) + cropTopF,
+                    x2.coerceIn(0f, cropWF) + cropLeftF,
+                    y2.coerceIn(0f, cropHF) + cropTopF
                 ),
                 classIndex = bestCls,
                 className  = CLASS_NAMES[bestCls],
@@ -311,12 +349,11 @@ class YoloDetector(private val context: Context) {
         }
 
         result.close()
-        return nms(dets)
+        return dets
     }
 
-    // ── Non-Maximum Suppression (per class) ───────────────────────────────────
-
     private fun nms(dets: List<Detection>): List<Detection> {
+        if (dets.isEmpty()) return emptyList()
         val sorted     = dets.sortedByDescending { it.confidence }
         val suppressed = BooleanArray(sorted.size)
         val kept       = mutableListOf<Detection>()
