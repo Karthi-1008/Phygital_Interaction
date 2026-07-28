@@ -1,6 +1,9 @@
 package com.madrasmindworks.kinderjoydetector.ar
 
 import android.util.Log
+import com.google.ar.core.Anchor
+import com.google.ar.core.Frame
+import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
@@ -55,7 +58,7 @@ class AnchorManager {
         // Clear previous anchor if toy class changed or tracking lost
         clearAnchor(sceneView)
 
-        val frame = sceneView.frame ?: run {
+        val frame: Frame = sceneView.currentFrame ?: sceneView.arSession?.currentFrame ?: run {
             Log.w(TAG, "[AR-DIAG] Cannot perform hit test: ARFrame is null")
             return false
         }
@@ -75,14 +78,14 @@ class AnchorManager {
         }
 
         val anchor = validHit.createAnchor()
-        val anchorNode = AnchorNode(sceneView.engine, anchor)
+        val anchorNode = AnchorNode(engine = sceneView.engine, anchor = anchor)
         val modelNode = ModelNode(
             modelInstance = modelInstance,
             scaleToUnits = 0.4f
         )
 
-        anchorNode.addChildNode(modelNode)
-        sceneView.addChildNode(anchorNode)
+        modelNode.parent = anchorNode
+        anchorNode.parent = sceneView
 
         activeAnchorNode = anchorNode
         activeModelNode = modelNode
@@ -95,11 +98,12 @@ class AnchorManager {
 
     fun clearAnchor(sceneView: ARSceneView) {
         activeModelNode?.let { model ->
-            activeAnchorNode?.removeChildNode(model)
+            model.parent = null
+            model.destroy()
             activeModelNode = null
         }
         activeAnchorNode?.let { anchorNode ->
-            sceneView.removeChildNode(anchorNode)
+            anchorNode.parent = null
             anchorNode.destroy()
             activeAnchorNode = null
         }
