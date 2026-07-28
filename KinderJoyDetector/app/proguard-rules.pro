@@ -1,13 +1,15 @@
-# ProGuard rules for KinderJoyDetector
+# Keep ONNX Runtime
+-keep class ai.onnxruntime.** { *; }
+-keep class com.microsoft.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**
 
-# OpenCV
--keep class org.opencv.** { *; }
--keepclassmembers class org.opencv.** { *; }
+# Keep our detector classes
+-keep class com.madrasmindworks.kinderjoydetector.** { *; }
 
-# SceneView / Filament
--keep class com.google.android.filament.** { *; }
--keep class io.github.sceneview.** { *; }
--dontwarn io.github.sceneview.**
+# Keep CameraX
+-keep class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
 
-# kotlin-math
--keep class dev.romainguy.kotlin.math.** { *; }
+# General Android rules
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable

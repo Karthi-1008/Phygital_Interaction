@@ -6,6 +6,7 @@ Real-time YOLO11n toy detector using ONNX Runtime + CameraX.
 **Model:** `exp-3.onnx` (YOLO11n, 5.3 MB)  
 **Min Android:** API 21 (Android 5.0 Lollipop) — Universal APK
 
+---
 
 ## Quick Build (Android Studio)
 
