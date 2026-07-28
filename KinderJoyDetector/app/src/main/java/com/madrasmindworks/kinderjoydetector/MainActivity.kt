@@ -1,7 +1,5 @@
 package com.madrasmindworks.kinderjoydetector
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
@@ -12,34 +10,40 @@ import android.util.Size
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.madrasmindworks.kinderjoydetector.ar.ArManager
+import androidx.lifecycle.lifecycleScope
+import com.madrasmindworks.kinderjoydetector.ar.ARPositionCalculator
+import com.madrasmindworks.kinderjoydetector.ar.ARViewController
 import com.madrasmindworks.kinderjoydetector.databinding.ActivityMainBinding
+import com.madrasmindworks.kinderjoydetector.utils.PermissionHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var permissionHelper: PermissionHelper
     private lateinit var detector: YoloDetector
     private lateinit var inferenceExecutor: ExecutorService
     private lateinit var cameraProvider: ProcessCameraProvider
-    private lateinit var arManager: ArManager
+    private lateinit var arViewController: ARViewController
 
-    private var activeModelClassIndex = -1
-    private var lockedClassIndex = -1
+    private var toyLostJob: Job? = null
+    private var lastDetectedRect: RectF? = null
 
-    // Frame skip — never pile up work
+    // Frame skip guard
     @Volatile private var isProcessing = false
-
-    // Reused across frames — camera resolution is fixed, so allocate once
     private var reusableBitmap: Bitmap? = null
 
-    // Guide box, defined once in FRAME pixel coords
+    // Guide box
     private var guideBoxFrame: RectF? = null
     private var guideBoxRect: Rect? = null
 
@@ -48,7 +52,7 @@ class MainActivity : AppCompatActivity() {
     private var framesSinceLastDet = 0
     private val HOLD_FRAMES = 6
 
-    // Multi-frame temporal stability tracking & 60% confidence confirmation
+    // Multi-frame temporal stability tracking
     private var candidateClassIndex = -1
     private var candidateFrameCount = 0
     private var attemptFrameCount = 0
@@ -57,56 +61,58 @@ class MainActivity : AppCompatActivity() {
     private val MIN_COVERAGE = 0.50f
     private val UNKNOWN_TIMEOUT_FRAMES = 35
 
-    // Progress bar
     private var progress = 0f
     private val PROGRESS_STEP = 0.055f
     private val PROGRESS_DECAY = 0.09f
 
-    // Locks toy selection upon 3 stable confirmations
     @Volatile private var detectionLocked = false
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val REQ_CAMERA = 10
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        enableEdgeToEdge()
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        arManager = ArManager(this)
-        arManager.setup(binding.arSceneView)
+        permissionHelper = PermissionHelper(
+            activity = this,
+            onGranted = { startARPipeline() },
+            onDenied = { showPermissionDeniedMessage() }
+        )
 
-        val isArSupported = arManager.checkArSupport()
-        if (!isArSupported) {
-            Toast.makeText(this, "AR is not supported on this device", Toast.LENGTH_LONG).show()
-        }
+        permissionHelper.checkAndRequest()
+    }
 
-        binding.statusText.text = "Loading model…"
+    private fun startARPipeline() {
+        binding.statusText.text = "Loading detector model…"
         binding.btnScanAgain.setOnClickListener { resetForNewScan() }
 
-        inferenceExecutor = Executors.newSingleThreadExecutor()
+        // 1. Initialize AR View Controller
+        arViewController = ARViewController(binding.sceneView, this, lifecycleScope)
+        arViewController.init()
 
+        // 2. Initialize Executor & YOLO Detector
+        inferenceExecutor = Executors.newSingleThreadExecutor()
         inferenceExecutor.execute {
             detector = YoloDetector(this)
             detector.load()
             runOnUiThread {
                 if (detector.isLoaded) {
-                    binding.statusText.text = if (isArSupported) "Point camera at a toy — hold it in the box" else "Point camera at a toy (Detection only - AR unsupported)"
+                    binding.statusText.text = "Point camera at a toy — hold it in the box"
                 } else {
                     binding.statusText.text = "Model failed to load"
                     binding.statusText.setTextColor(Color.RED)
                 }
-                if (hasCameraPermission()) startCamera() else requestCameraPermission()
+                startCamera()
             }
         }
     }
-
-    // ── Camera ────────────────────────────────────────────────────────────────
 
     private fun startCamera() {
         val future = ProcessCameraProvider.getInstance(this)
@@ -116,6 +122,7 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .setTargetResolution(Size(360, 480))
                 .build()
+                .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
 
             val analysis = ImageAnalysis.Builder()
                 .setTargetResolution(Size(360, 480))
@@ -127,7 +134,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
-                Log.i(TAG, "Camera bound successfully")
+                Log.i(TAG, "Camera bound successfully to PreviewView")
             } catch (e: Exception) {
                 Log.e(TAG, "Camera bind failed", e)
             }
@@ -138,8 +145,6 @@ class MainActivity : AppCompatActivity() {
         if (::cameraProvider.isInitialized) cameraProvider.unbindAll()
     }
 
-    // ── Guide box ─────────────────────────────────────────────────────────────
-
     private fun ensureGuideBox(frameW: Int, frameH: Int) {
         if (guideBoxFrame != null) return
         val size = (minOf(frameW, frameH) * 0.62f)
@@ -148,8 +153,6 @@ class MainActivity : AppCompatActivity() {
         guideBoxFrame = RectF(left, top, left + size, top + size)
         guideBoxRect = Rect(left.toInt(), top.toInt(), (left + size).toInt(), (top + size).toInt())
     }
-
-    // ── Frame processing ──────────────────────────────────────────────────────
 
     private fun processFrame(image: ImageProxy) {
         if (isProcessing) { image.close(); return }
@@ -195,8 +198,7 @@ class MainActivity : AppCompatActivity() {
                 if (candidateFrameCount >= REQUIRED_STABLE_FRAMES) {
                     confirmedDet = topDet
                     isConfirmed = true
-                    lockedClassIndex = topDet.classIndex
-                    Log.i(TAG, "[AR-DIAG] Toy confirmed: ${topDet.className} (${topDet.confidence * 100}%)")
+                    Log.i(TAG, "Toy confirmed: ${topDet.className} (${topDet.confidence * 100}%)")
                 } else {
                     confirmedDet = null
                     isConfirmed = false
@@ -204,53 +206,22 @@ class MainActivity : AppCompatActivity() {
                     framesSinceLastDet = 0
                 }
             } else {
-                val hasObjectInBox = rawDets.any { calculateCoverage(it.rect, boxF) >= 0.20f }
-                if (hasObjectInBox) {
-                    attemptFrameCount++
-                } else {
-                    attemptFrameCount = (attemptFrameCount - 1).coerceAtLeast(0)
-                }
-
                 candidateClassIndex = -1
                 candidateFrameCount = 0
-
-                if (attemptFrameCount >= UNKNOWN_TIMEOUT_FRAMES) {
-                    confirmedDet = YoloDetector.Detection(
-                        rect = boxF,
-                        classIndex = -1,
-                        className = "Unknown",
-                        confidence = 0f
-                    )
-                    isConfirmed = true
-                    lockedClassIndex = -1
+                confirmedDet = null
+                isConfirmed = false
+                if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
+                    framesSinceLastDet++
                 } else {
-                    confirmedDet = null
-                    isConfirmed = false
-                    if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
-                        framesSinceLastDet++
-                    } else {
-                        lastDets = emptyList()
-                    }
+                    lastDets = emptyList()
                 }
             }
         } else {
             confirmedDet = null
             isConfirmed = false
-            if (highConfInBoxDets.isNotEmpty()) {
-                lastDets = highConfInBoxDets
-                framesSinceLastDet = 0
-            } else if (rawDets.isNotEmpty()) {
-                lastDets = rawDets
-                framesSinceLastDet = 0
-            } else if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
-                framesSinceLastDet++
-            } else {
-                lastDets = emptyList()
-            }
         }
 
-        val liveDets = rawDets.filter { it.classIndex >= 0 && calculateCoverage(it.rect, boxF) >= 0.20f }
-        val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (liveDets.isNotEmpty()) liveDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList()))
+        val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList())
 
         if (isConfirmed && confirmedDet != null) {
             detectionLocked = true
@@ -263,7 +234,7 @@ class MainActivity : AppCompatActivity() {
                 showDetectionResult(confirmedDet)
 
                 if (confirmedDet.classIndex >= 0) {
-                    triggerSingleArAnchor(confirmedDet.rect, srcW, srcH, confirmedDet.classIndex)
+                    onToyDetected(confirmedDet.rect, confirmedDet.classIndex)
                 }
             }
         } else {
@@ -276,7 +247,9 @@ class MainActivity : AppCompatActivity() {
                 updateStatus(activeDets)
 
                 if (activeDets.isNotEmpty() && activeDets[0].classIndex >= 0) {
-                    triggerSingleArAnchor(activeDets[0].rect, srcW, srcH, activeDets[0].classIndex)
+                    onToyDetected(activeDets[0].rect, activeDets[0].classIndex)
+                } else {
+                    onToyLost()
                 }
             }
         }
@@ -284,24 +257,22 @@ class MainActivity : AppCompatActivity() {
         isProcessing = false
     }
 
-    /**
-     * Executes single ARCore Hit Test ONCE upon toy confirmation, creating a true 3D spatial Anchor.
-     * ARCore maintains 6-DoF pose updates automatically afterwards.
-     */
-    private fun triggerSingleArAnchor(rect: RectF, frameW: Int, frameH: Int, classIndex: Int) {
-        val viewW = binding.arSceneView.width.takeIf { it > 0 } ?: frameW
-        val viewH = binding.arSceneView.height.takeIf { it > 0 } ?: frameH
+    private fun onToyDetected(rect: RectF, classIndex: Int) {
+        toyLostJob?.cancel()
+        lastDetectedRect = rect
 
-        val scaleX = viewW.toFloat() / frameW
-        val scaleY = viewH.toFloat() / frameH
-        val scale  = minOf(scaleX, scaleY)
-        val offsetX = (viewW - frameW * scale) / 2f
-        val offsetY = (viewH - frameH * scale) / 2f
+        val worldPos = ARPositionCalculator.toWorldPosition(rect)
+        val scale = ARPositionCalculator.toModelScale(rect)
 
-        val centerX = rect.centerX() * scale + offsetX
-        val centerY = rect.centerY() * scale + offsetY
+        arViewController.loadAndShowModel(classIndex, worldPos, scale)
+    }
 
-        arManager.onToyConfirmed(classIndex, centerX, centerY)
+    private fun onToyLost() {
+        toyLostJob?.cancel()
+        toyLostJob = lifecycleScope.launch {
+            delay(1500)
+            arViewController.hideModel()
+        }
     }
 
     private fun calculateCoverage(pred: RectF, guideBox: RectF): Float {
@@ -318,11 +289,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun imageProxyToBitmap(img: ImageProxy): Bitmap {
-        val plane      = img.planes[0]
-        val rowStride  = plane.rowStride
-        val pixStride  = plane.pixelStride
-        val rowPad     = rowStride - pixStride * img.width
-        val strideW    = img.width + rowPad / pixStride
+        val plane = img.planes[0]
+        val rowStride = plane.rowStride
+        val pixStride = plane.pixelStride
+        val rowPad = rowStride - pixStride * img.width
+        val strideW = img.width + rowPad / pixStride
 
         var bmp = reusableBitmap
         if (bmp == null || bmp.width != strideW || bmp.height != img.height) {
@@ -339,30 +310,19 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = when {
             dets.isEmpty() -> "Hold a toy inside the box"
             dets[0].classIndex < 0 -> "Unknown object"
-            else -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}% — AR Spatial Anchor Active"
+            else -> "${dets[0].className} ${"%.0f".format(dets[0].confidence * 100)}% — 3D Overlay Active"
         }
         binding.statusText.setTextColor(if (dets.isEmpty()) Color.LTGRAY else Color.WHITE)
     }
 
     private fun showDetectionResult(det: YoloDetector.Detection) {
         binding.resultContainer.visibility = View.VISIBLE
-        if (det.classIndex < 0 || det.className == "Unknown") {
-            binding.resultTitle.text = "Unknown Object"
-        } else {
-            binding.resultTitle.text = "${det.className} Confirmed!"
-        }
+        binding.resultTitle.text = if (det.classIndex < 0 || det.className == "Unknown") "Unknown Object" else "${det.className} Confirmed!"
     }
 
     private fun resetForNewScan() {
-        activeModelClassIndex = -1
-        lockedClassIndex = -1
-        arManager.clearArSession()
-
+        arViewController.hideModel()
         binding.resultContainer.visibility = View.GONE
-        binding.arSceneView.visibility = View.VISIBLE
-        binding.overlayView.visibility = View.VISIBLE
-        binding.statusText.visibility = View.VISIBLE
-
         progress = 0f
         lastDets = emptyList()
         framesSinceLastDet = 0
@@ -374,27 +334,16 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = "Point camera at a toy — hold it in the box"
     }
 
-    private fun hasCameraPermission() =
-        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-
-    private fun requestCameraPermission() =
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), REQ_CAMERA)
-
-    override fun onRequestPermissionsResult(req: Int, perms: Array<String>, results: IntArray) {
-        super.onRequestPermissionsResult(req, perms, results)
-        if (req == REQ_CAMERA) {
-            if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) startCamera()
-            else Toast.makeText(this, "Camera permission needed", Toast.LENGTH_LONG).show()
-        }
+    private fun showPermissionDeniedMessage() {
+        Toast.makeText(this, "Camera permission is required to detect toys and render 3D AR overlays.", Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopCamera()
-        inferenceExecutor.shutdown()
+        if (::cameraProvider.isInitialized) stopCamera()
+        if (::inferenceExecutor.isInitialized) inferenceExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
         reusableBitmap?.recycle()
-        arManager.clearArSession()
+        if (::arViewController.isInitialized) arViewController.destroy()
     }
 }

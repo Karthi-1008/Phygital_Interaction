@@ -4,12 +4,9 @@
     <!-- Camera permission -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Declare camera hardware -->
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Hardware features -->
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-
-    <!-- ARCore hardware feature declaration (optional so non-ARCore devices can run YOLO detection) -->
-    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <application
         android:allowBackup="false"
@@ -19,19 +16,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KinderJoyDetector"
         android:hardwareAccelerated="true"
+        android:largeHeap="true"
         android:name="androidx.multidex.MultiDexApplication">
 
-        <!-- ARCore metadata for Google Play Services for AR -->
-        <meta-data
-            android:name="com.google.ar.core"
-            android:value="optional" />
+        <uses-library android:name="org.apache.http.legacy" android:required="false" />
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:windowSoftInputMode="stateHidden"
-            android:configChanges="orientation|keyboardHidden|screenSize">
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
