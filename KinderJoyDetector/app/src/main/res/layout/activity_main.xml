@@ -6,36 +6,25 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Camera preview — fitCenter so FULL frame is visible, no cropping -->
-    <androidx.camera.view.PreviewView
-        android:id="@+id/previewView"
+    <!-- ARSceneView: Unified ARCore camera preview + Filament 3D AR rendering layer -->
+    <io.github.sceneview.ar.ARSceneView
+        android:id="@+id/arSceneView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:scaleType="fitCenter" />
-
-    <!-- 3D AR SurfaceView layered directly over camera preview -->
-    <SurfaceView
-        android:id="@+id/modelSurface"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        app:layout_constraintTop_toTopOf="@id/previewView"
-        app:layout_constraintBottom_toBottomOf="@id/previewView"
-        app:layout_constraintStart_toStartOf="@id/previewView"
-        app:layout_constraintEnd_toEndOf="@id/previewView" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Overlay: guide box + progress ring only (see OverlayView.kt) -->
     <com.madrasmindworks.kinderjoydetector.OverlayView
         android:id="@+id/overlayView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintTop_toTopOf="@id/previewView"
-        app:layout_constraintBottom_toBottomOf="@id/previewView"
-        app:layout_constraintStart_toStartOf="@id/previewView"
-        app:layout_constraintEnd_toEndOf="@id/previewView" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Minimal top title -->
     <TextView
@@ -44,7 +33,7 @@
         android:background="#BB000000"
         android:paddingVertical="10dp"
         android:paddingHorizontal="16dp"
-        android:text="🎯 Kinder Joy Detector"
+        android:text="🎯 Kinder Joy AR Detector"
         android:textColor="#FFFFFF"
         android:textSize="15sp"
         android:textStyle="bold"
@@ -52,7 +41,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Single status line — what to do / what's being held in the box -->
+    <!-- Single status line -->
     <TextView
         android:id="@+id/statusText"
         android:layout_width="0dp"
@@ -69,7 +58,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- ══════════════════ Result overlay banner (non-blocking, camera + AR model remain visible) ══════════════════ -->
+    <!-- Result overlay banner (non-blocking, camera + AR model remain visible) -->
     <LinearLayout
         android:id="@+id/resultContainer"
         android:layout_width="0dp"

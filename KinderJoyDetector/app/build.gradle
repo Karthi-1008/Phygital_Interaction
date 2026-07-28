@@ -9,19 +9,15 @@ android {
 
     defaultConfig {
         applicationId "com.madrasmindworks.kinderjoydetector"
-        minSdk 21
+        minSdk 24
         targetSdk 34
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // Enable multi-dex for older devices
         multiDexEnabled true
 
-        // Package native libs for every architecture Filament/ONNX Runtime
-        // ship prebuilt binaries for, so the app runs on any real device AND
-        // any emulator (x86/x86_64 included) rather than just arm64 phones.
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
         }
@@ -29,10 +25,9 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // Sign with debug key for easy testing — replace with your keystore for production
             signingConfig signingConfigs.debug
         }
         debug {
@@ -41,34 +36,22 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
     }
 
     buildFeatures {
         viewBinding true
     }
 
-    // Package ONNX model and GLB 3D assets uncompressed
     aaptOptions {
         noCompress "onnx", "glb"
     }
 
-    // ABI splits for smaller APK sizes per architecture
-    splits {
-        abi {
-            enable false  // Set true to generate per-ABI APKs; false for universal APK
-            reset()
-            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
-            universalApk true
-        }
-    }
-
-    // Packaging options
     packagingOptions {
         jniLibs {
             pickFirsts += ["**/libc++_shared.so"]
@@ -91,15 +74,17 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
 
-    // ONNX Runtime for Android — GPU + CPU execution providers
+    // ONNX Runtime for Android
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.17.0'
 
-    // Filament 3D Engine for AR Overlay across Android 8 to 15
-    implementation 'com.google.android.filament:filament-android:1.45.0'
-    implementation 'com.google.android.filament:gltfio-android:1.45.0'
-    implementation 'com.google.android.filament:filament-utils-android:1.45.0'
+    // ARCore SDK
+    implementation 'com.google.ar:core:1.41.0'
 
-    // Lifecycle
+    // SceneView AR Engine (Filament + ARCore wrapper)
+    implementation 'io.github.sceneview:arsceneview:2.2.1'
+
+    // Lifecycle & Coroutines
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
     implementation 'androidx.activity:activity-ktx:1.8.2'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 }

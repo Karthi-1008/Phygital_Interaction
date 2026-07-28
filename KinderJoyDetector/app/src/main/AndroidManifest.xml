@@ -4,9 +4,12 @@
     <!-- Camera permission -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Declare camera hardware (not required, just hints store) -->
+    <!-- Declare camera hardware -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- ARCore hardware feature declaration (optional so non-ARCore devices can run YOLO detection) -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <application
         android:allowBackup="false"
@@ -17,6 +20,11 @@
         android:theme="@style/Theme.KinderJoyDetector"
         android:hardwareAccelerated="true"
         android:name="androidx.multidex.MultiDexApplication">
+
+        <!-- ARCore metadata for Google Play Services for AR -->
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional" />
 
         <activity
             android:name=".MainActivity"
