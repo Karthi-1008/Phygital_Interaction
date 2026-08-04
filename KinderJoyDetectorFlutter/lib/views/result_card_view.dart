@@ -59,14 +59,42 @@ class ResultCardView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'TOY CONFIRMED',
-                        style: GoogleFonts.orbitron(
-                          color: color,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'TOY CONFIRMED',
+                            style: GoogleFonts.orbitron(
+                              color: color,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2ECC71).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF2ECC71), width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.play_arrow_rounded, color: Color(0xFF2ECC71), size: 12),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '3D ANIMATING',
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF2ECC71),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
