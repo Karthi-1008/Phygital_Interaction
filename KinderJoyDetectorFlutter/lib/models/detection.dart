@@ -16,6 +16,8 @@ class Detection {
 
   Color get color => ToyMetadata.colors[classIndex % ToyMetadata.colors.length];
   String get glbAsset => ToyMetadata.glbPaths[classIndex] ?? '';
+  String? get defaultAnimation => ToyMetadata.defaultAnimationNames[classIndex];
+  List<String> get availableAnimations => ToyMetadata.availableAnimationTracks[classIndex] ?? [];
 
   Detection copyWith({
     Rect? rect,
@@ -63,6 +65,22 @@ class ToyMetadata {
     1: 'assets/models/hermione.glb',
     2: 'assets/models/batman.glb',
     3: 'assets/models/flash.glb',
+  };
+
+  /// Exact animation track names inspected from GLB binary structures
+  static const Map<int, String?> defaultAnimationNames = {
+    0: null, // Harry Potter: Static 3D mesh (utilizes spatial 360° AR rotation & levitation)
+    1: 'metarig|idle', // Hermione: Idle stance animation
+    2: 'Armature|Armature|mixamo.com|Layer0', // Batman: Mixamo stance animation
+    3: 'waveHello', // Flash: Action animation
+  };
+
+  /// List of available GLB animation tracks per class
+  static const Map<int, List<String>> availableAnimationTracks = {
+    0: [],
+    1: ['metarig|idle', 'metarig|none'],
+    2: ['Armature|Armature|mixamo.com|Layer0'],
+    3: ['waveHello', 'run', 'punch', 'jumpUp', 'walk', 'stand', 'strafeLeft', 'strafeRight'],
   };
 
   /// NMS IoU threshold

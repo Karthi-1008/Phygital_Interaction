@@ -3,7 +3,7 @@ import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../models/detection.dart';
 import '../services/glb_asset_loader.dart';
 
-/// 3D AR Model Overlay Widget rendering GLB assets with automatic skeletal animation playback
+/// 3D AR Model Overlay Widget rendering GLB assets with exact inspected skeletal animation tracks
 class ArModelOverlay extends StatefulWidget {
   final Detection detection;
   final Size screenSize;
@@ -24,6 +24,7 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
   late Animation<double> _scaleAnimation;
 
   String? _localFilePath;
+  int _currentAnimIndex = 0;
 
   @override
   void initState() {
@@ -51,10 +52,20 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
       if (mounted) {
         setState(() {
           _localFilePath = path;
+          _currentAnimIndex = 0;
         });
       }
     } catch (e) {
       debugPrint('GLB asset prep error: $e');
+    }
+  }
+
+  void _cycleNextAnimation() {
+    final tracks = widget.detection.availableAnimations;
+    if (tracks.isNotEmpty) {
+      setState(() {
+        _currentAnimIndex = (_currentAnimIndex + 1) % tracks.length;
+      });
     }
   }
 
@@ -76,6 +87,10 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
   Widget build(BuildContext context) {
     final rect = widget.detection.rect;
     final String assetPath = widget.detection.glbAsset;
+    final List<String> animTracks = widget.detection.availableAnimations;
+    final String? activeAnimName = animTracks.isNotEmpty
+        ? animTracks[_currentAnimIndex % animTracks.length]
+        : widget.detection.defaultAnimation;
 
     // Dynamically position and scale 3D viewport over detected bounding box
     final double width = rect.width.clamp(180.0, widget.screenSize.width * 0.92);
@@ -85,7 +100,6 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
 
     if (assetPath.isEmpty) return const SizedBox.shrink();
 
-    // Use local file URI if extracted, otherwise Flutter asset path
     final String modelSrc = (_localFilePath != null && _localFilePath!.isNotEmpty)
         ? 'file://$_localFilePath'
         : assetPath;
@@ -100,30 +114,68 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
           height: height,
           child: Transform.scale(
             scale: _scaleAnimation.value,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.detection.color.withOpacity(0.55),
-                    blurRadius: 35,
-                    spreadRadius: 6,
+            child: GestureDetector(
+              onTap: _cycleNextAnimation,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.detection.color.withOpacity(0.55),
+                      blurRadius: 35,
+                      spreadRadius: 6,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      ModelViewer(
+                        key: ValueKey('${widget.detection.classIndex}_${activeAnimName ?? "none"}_$modelSrc'),
+                        src: modelSrc,
+                        alt: '3D AR Model ${widget.detection.className}',
+                        ar: false,
+                        autoRotate: true,
+                        autoPlay: true,
+                        animationName: activeAnimName,
+                        cameraControls: true,
+                        disableZoom: true,
+                        backgroundColor: Colors.transparent,
+                        loading: Loading.eager,
+                      ),
+
+                      // Animation Track Badge (if model has multiple animation tracks)
+                      if (animTracks.length > 1)
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.75),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: widget.detection.color),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.touch_app, color: Colors.white, size: 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  activeAnimName ?? 'Anim',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: ModelViewer(
-                  key: ValueKey('${widget.detection.classIndex}_$modelSrc'),
-                  src: modelSrc,
-                  alt: '3D AR Model ${widget.detection.className}',
-                  ar: false,
-                  autoRotate: true,
-                  autoPlay: true,
-                  cameraControls: true,
-                  disableZoom: true,
-                  backgroundColor: Colors.transparent,
-                  loading: Loading.eager,
                 ),
               ),
             ),
