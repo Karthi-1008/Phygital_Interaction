@@ -45,7 +45,6 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
         return;
       }
 
-      // Select rear-facing camera
       final rearCamera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
@@ -53,7 +52,7 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
 
       _cameraController = CameraController(
         rearCamera,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -79,22 +78,51 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
     try {
       final Size screenSize = MediaQuery.of(context).size;
       final double boxSize = screenSize.width * 0.65;
-      final Rect guideBox = Rect.fromCenter(
+      final Rect guideBoxOnScreen = Rect.fromCenter(
         center: Offset(screenSize.width / 2, screenSize.height / 2),
         width: boxSize,
         height: boxSize,
       );
 
+      // Handle orientation: Camera frame width vs height in portrait mode
+      final bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+      final int frameW = isPortrait ? image.height : image.width;
+      final int frameH = isPortrait ? image.width : image.height;
+
+      // 1. Convert Screen guideBox to Camera Frame coordinates
+      final double scaleX = frameW / screenSize.width;
+      final double scaleY = frameH / screenSize.height;
+
+      final Rect frameCropRect = Rect.fromLTRB(
+        (guideBoxOnScreen.left * scaleX).clamp(0.0, frameW - 1),
+        (guideBoxOnScreen.top * scaleY).clamp(0.0, frameH - 1),
+        (guideBoxOnScreen.right * scaleX).clamp(1.0, frameW.toDouble()),
+        (guideBoxOnScreen.bottom * scaleY).clamp(1.0, frameH.toDouble()),
+      );
+
       final Uint8List rgbaPixels = _extractRGBABuffer(image);
 
-      final List<Detection> detections = _detector.detect(
+      // 2. Run detection on camera frame
+      final List<Detection> rawFrameDetections = _detector.detect(
         rgbaPixels: rgbaPixels,
         width: image.width,
         height: image.height,
-        cropRect: guideBox,
+        cropRect: frameCropRect,
       );
 
-      _manager.processFrameDetections(detections, guideBox);
+      // 3. Map detected boxes back from Camera Frame to Screen coordinates
+      final List<Detection> screenDetections = rawFrameDetections.map((det) {
+        final screenRect = Rect.fromLTRB(
+          det.rect.left / scaleX,
+          det.rect.top / scaleY,
+          det.rect.right / scaleX,
+          det.rect.bottom / scaleY,
+        );
+        return det.copyWith(rect: screenRect);
+      }).toList();
+
+      // 4. Process state machine using screen mapped detections & guide box
+      _manager.processFrameDetections(screenDetections, guideBoxOnScreen);
     } catch (e) {
       debugPrint('Frame processing error: $e');
     } finally {
@@ -210,7 +238,7 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Live Camera Preview - Aspect ratio fitted to fill any screen seamlessly
+          // 1. Live Camera Preview
           if (_cameraController != null && _cameraController!.value.isInitialized)
             SizedBox.expand(
               child: FittedBox(
@@ -239,7 +267,26 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
             },
           ),
 
-          // 3. Status Header
+          // 3. 3D AR Model Overlay (Render during Confirming or Confirmed states)
+          AnimatedBuilder(
+            animation: _manager,
+            builder: (context, child) {
+              final activeDet = _manager.confirmedDetection ??
+                  (_manager.currentDetections.isNotEmpty ? _manager.currentDetections.first : null);
+
+              if ((_manager.state == DetectionState.confirmed ||
+                      _manager.state == DetectionState.confirming) &&
+                  activeDet != null) {
+                return ArModelOverlay(
+                  detection: activeDet,
+                  screenSize: screenSize,
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+
+          // 4. Status Header
           Positioned(
             top: 50,
             left: 20,
@@ -289,21 +336,6 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
                 );
               },
             ),
-          ),
-
-          // 4. 3D AR Model View Overlay (Renders continuous 360° AR model when confirmed)
-          AnimatedBuilder(
-            animation: _manager,
-            builder: (context, child) {
-              if (_manager.state == DetectionState.confirmed &&
-                  _manager.confirmedDetection != null) {
-                return ArModelOverlay(
-                  detection: _manager.confirmedDetection!,
-                  screenSize: screenSize,
-                );
-              }
-              return const SizedBox.shrink();
-            },
           ),
 
           // 5. Result Card Popup
