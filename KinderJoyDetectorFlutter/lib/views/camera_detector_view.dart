@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/detection.dart';
 import '../services/detector_manager.dart';
+import '../services/glb_asset_loader.dart';
 import '../services/yolo_detector.dart';
 import 'ar_model_overlay.dart';
 import 'overlay_painter.dart';
@@ -35,6 +36,7 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
   Future<void> _initApp() async {
     try {
       await _detector.load();
+      await GlbAssetLoader.preloadAllModels();
 
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -84,12 +86,10 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
         height: boxSize,
       );
 
-      // Handle orientation: Camera frame width vs height in portrait mode
       final bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
       final int frameW = isPortrait ? image.height : image.width;
       final int frameH = isPortrait ? image.width : image.height;
 
-      // 1. Convert Screen guideBox to Camera Frame coordinates
       final double scaleX = frameW / screenSize.width;
       final double scaleY = frameH / screenSize.height;
 
@@ -102,7 +102,6 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
 
       final Uint8List rgbaPixels = _extractRGBABuffer(image);
 
-      // 2. Run detection on camera frame
       final List<Detection> rawFrameDetections = _detector.detect(
         rgbaPixels: rgbaPixels,
         width: image.width,
@@ -110,7 +109,6 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
         cropRect: frameCropRect,
       );
 
-      // 3. Map detected boxes back from Camera Frame to Screen coordinates
       final List<Detection> screenDetections = rawFrameDetections.map((det) {
         final screenRect = Rect.fromLTRB(
           det.rect.left / scaleX,
@@ -121,7 +119,6 @@ class _CameraDetectorViewState extends State<CameraDetectorView> with WidgetsBin
         return det.copyWith(rect: screenRect);
       }).toList();
 
-      // 4. Process state machine using screen mapped detections & guide box
       _manager.processFrameDetections(screenDetections, guideBoxOnScreen);
     } catch (e) {
       debugPrint('Frame processing error: $e');
