@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Native Android Kotlin APK
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-apk:
-    name: Build Android Release APK
+  build-native-apk:
+    name: Build Native Android Release APK (Kotlin + CameraX + ONNX + Filament 3D Engine)
     runs-on: ubuntu-latest
 
     steps:
@@ -22,26 +22,19 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.2'
-          channel: 'stable'
-          cache: true
-
-      - name: Get dependencies
+      - name: Make gradlew executable
         run: |
-          cd KinderJoyDetectorFlutter
-          flutter pub get
+          cd KinderJoyDetector
+          chmod +x gradlew
 
-      - name: Build Android APK
+      - name: Build Native Release APK
         run: |
-          cd KinderJoyDetectorFlutter
-          flutter build apk --release --no-tree-shake-icons
+          cd KinderJoyDetector
+          ./gradlew assembleRelease --stacktrace
 
-      - name: Upload APK Artifact
+      - name: Upload Native Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kinder-joy-detector-release-apk
-          path: KinderJoyDetectorFlutter/build/app/outputs/flutter-apk/app-release.apk
+          name: kinder-joy-native-kotlin-apk
+          path: KinderJoyDetector/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
