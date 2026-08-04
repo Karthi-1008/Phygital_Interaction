@@ -23,8 +23,7 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
   late Animation<double> _bounceAnimation;
   late Animation<double> _scaleAnimation;
 
-  String? _localGlbPath;
-  bool _isLoading = true;
+  String? _localFilePath;
 
   @override
   void initState() {
@@ -43,26 +42,19 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
 
-    _loadLocalGlbFile();
+    _prepareModelFile();
   }
 
-  Future<void> _loadLocalGlbFile() async {
+  Future<void> _prepareModelFile() async {
     try {
-      final String glbAsset = widget.detection.glbAsset;
-      final String path = await GlbAssetLoader.getLocalFilePath(glbAsset);
+      final path = await GlbAssetLoader.getLocalFilePath(widget.detection.glbAsset);
       if (mounted) {
         setState(() {
-          _localGlbPath = path;
-          _isLoading = false;
+          _localFilePath = path;
         });
       }
     } catch (e) {
-      debugPrint('Error loading local GLB file: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      debugPrint('GLB asset prep error: $e');
     }
   }
 
@@ -70,7 +62,7 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
   void didUpdateWidget(covariant ArModelOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.detection.classIndex != widget.detection.classIndex) {
-      _loadLocalGlbFile();
+      _prepareModelFile();
     }
   }
 
@@ -83,19 +75,20 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final rect = widget.detection.rect;
-    final glbAsset = widget.detection.glbAsset;
+    final String assetPath = widget.detection.glbAsset;
 
     // Dynamically position and scale 3D viewport over detected bounding box
-    final double width = rect.width.clamp(180.0, widget.screenSize.width * 0.90);
-    final double height = rect.height.clamp(180.0, widget.screenSize.height * 0.90);
+    final double width = rect.width.clamp(180.0, widget.screenSize.width * 0.92);
+    final double height = rect.height.clamp(180.0, widget.screenSize.height * 0.92);
     final double left = (rect.center.dx - width / 2).clamp(0.0, widget.screenSize.width - width);
     final double top = (rect.center.dy - height / 2).clamp(0.0, widget.screenSize.height - height);
 
-    if (glbAsset.isEmpty) return const SizedBox.shrink();
+    if (assetPath.isEmpty) return const SizedBox.shrink();
 
-    final String srcUrl = (_localGlbPath != null && _localGlbPath!.isNotEmpty)
-        ? 'file://$_localGlbPath'
-        : glbAsset;
+    // Use local file URI if extracted, otherwise Flutter asset path
+    final String modelSrc = (_localFilePath != null && _localFilePath!.isNotEmpty)
+        ? 'file://$_localFilePath'
+        : assetPath;
 
     return AnimatedBuilder(
       animation: _bounceController,
@@ -120,20 +113,18 @@ class _ArModelOverlayState extends State<ArModelOverlay> with SingleTickerProvid
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: Color(0xFF00E5FF)),
-                      )
-                    : ModelViewer(
-                        src: srcUrl,
-                        alt: '3D AR Model ${widget.detection.className}',
-                        ar: false,
-                        autoRotate: true,
-                        autoPlay: true,
-                        disableZoom: true,
-                        backgroundColor: Colors.transparent,
-                        loading: Loading.eager,
-                      ),
+                child: ModelViewer(
+                  key: ValueKey('${widget.detection.classIndex}_$modelSrc'),
+                  src: modelSrc,
+                  alt: '3D AR Model ${widget.detection.className}',
+                  ar: false,
+                  autoRotate: true,
+                  autoPlay: true,
+                  cameraControls: true,
+                  disableZoom: true,
+                  backgroundColor: Colors.transparent,
+                  loading: Loading.eager,
+                ),
               ),
             ),
           ),
