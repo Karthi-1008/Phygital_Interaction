@@ -58,13 +58,13 @@ android {
         noCompress "onnx", "glb"
     }
 
-    // ABI splits for smaller APK sizes per architecture
+    // ABI splits for optimized per-architecture build sizes (<10MB per APK)
     splits {
         abi {
-            enable false  // Set true to generate per-ABI APKs; false for universal APK
+            enable true
             reset()
-            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
-            universalApk true
+            include "arm64-v8a", "armeabi-v7a", "x86_64"
+            universalApk false
         }
     }
 

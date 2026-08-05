@@ -10,6 +10,10 @@
 -keep class androidx.camera.** { *; }
 -dontwarn androidx.camera.**
 
+# Keep Filament native engine and gltfio
+-keep class com.google.android.filament.** { *; }
+-dontwarn com.google.android.filament.**
+
 # General Android rules
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
