@@ -53,18 +53,18 @@ android {
         viewBinding true
     }
 
-    // Package ONNX model and GLB 3D assets uncompressed
+    // Package ONNX model uncompressed
     aaptOptions {
-        noCompress "onnx", "glb"
+        noCompress "onnx"
     }
 
-    // ABI splits for optimized per-architecture build sizes (<10MB per APK)
+    // ABI splits for smaller APK sizes per architecture
     splits {
         abi {
-            enable true
+            enable false  // Set true to generate per-ABI APKs; false for universal APK
             reset()
-            include "arm64-v8a", "armeabi-v7a", "x86_64"
-            universalApk false
+            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+            universalApk true
         }
     }
 
@@ -93,11 +93,6 @@ dependencies {
 
     // ONNX Runtime for Android — GPU + CPU execution providers
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.17.0'
-
-    // Filament 3D Engine for AR Overlay across Android 8 to 15
-    implementation 'com.google.android.filament:filament-android:1.45.0'
-    implementation 'com.google.android.filament:gltfio-android:1.45.0'
-    implementation 'com.google.android.filament:filament-utils-android:1.45.0'
 
     // Lifecycle
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
