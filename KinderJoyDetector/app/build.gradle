@@ -17,10 +17,12 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // Filter to 64-bit ARM (arm64-v8a) architecture to keep APK size < 10MB
-        // (removes redundant multi-ABI native .so bloat).
         ndk {
             abiFilters "arm64-v8a"
         }
+
+        // Keep only English strings to strip unused localization resources
+        resourceConfigurations += ['en']
     }
 
     buildTypes {
@@ -29,6 +31,9 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.debug
+            ndk {
+                debugSymbolLevel = 'NONE'
+            }
         }
         debug {
             minifyEnabled false
@@ -48,7 +53,7 @@ android {
         viewBinding true
     }
 
-    // Packaging options to eliminate redundant metadata and strip overhead
+    // Packaging options to compress native libs and eliminate redundant metadata
     packagingOptions {
         resources {
             excludes += [
@@ -68,7 +73,8 @@ android {
             ]
         }
         jniLibs {
-            useLegacyPackaging = false
+            // Compress .so libraries inside the APK file to reduce APK file size to <10MB
+            useLegacyPackaging = true
             pickFirsts += ["**/libc++_shared.so"]
         }
     }
