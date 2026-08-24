@@ -1,0 +1,606 @@
+[
+  {
+    "epoch": 0,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 1,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 2,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 3,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 4,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 5,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 6,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 7,
+    "gpuTemp": 53.25
+  },
+  {
+    "epoch": 8,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 9,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 10,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 11,
+    "gpuTemp": 54.375
+  },
+  {
+    "epoch": 12,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 13,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 14,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 15,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 16,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 17,
+    "gpuTemp": 52.75
+  },
+  {
+    "epoch": 18,
+    "gpuTemp": 54.75
+  },
+  {
+    "epoch": 19,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 20,
+    "gpuTemp": 54.5
+  },
+  {
+    "epoch": 21,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 22,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 23,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 24,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 25,
+    "gpuTemp": 54
+  },
+  {
+    "epoch": 26,
+    "gpuTemp": 54
+  },
+  {
+    "epoch": 27,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 28,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 29,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 30,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 31,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 32,
+    "gpuTemp": 53.25
+  },
+  {
+    "epoch": 33,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 34,
+    "gpuTemp": 52.5
+  },
+  {
+    "epoch": 35,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 36,
+    "gpuTemp": 52.25
+  },
+  {
+    "epoch": 37,
+    "gpuTemp": 54.375
+  },
+  {
+    "epoch": 38,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 39,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 40,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 41,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 42,
+    "gpuTemp": 52.75
+  },
+  {
+    "epoch": 43,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 44,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 45,
+    "gpuTemp": 54
+  },
+  {
+    "epoch": 46,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 47,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 48,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 49,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 50,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 51,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 52,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 53,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 54,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 55,
+    "gpuTemp": 52.25
+  },
+  {
+    "epoch": 56,
+    "gpuTemp": 52.5
+  },
+  {
+    "epoch": 57,
+    "gpuTemp": 52.5
+  },
+  {
+    "epoch": 58,
+    "gpuTemp": 53.25
+  },
+  {
+    "epoch": 59,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 60,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 61,
+    "gpuTemp": 52
+  },
+  {
+    "epoch": 62,
+    "gpuTemp": 53.25
+  },
+  {
+    "epoch": 63,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 64,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 65,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 66,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 67,
+    "gpuTemp": 53.25
+  },
+  {
+    "epoch": 68,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 69,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 70,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 71,
+    "gpuTemp": 54.5
+  },
+  {
+    "epoch": 72,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 73,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 74,
+    "gpuTemp": 54.875
+  },
+  {
+    "epoch": 75,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 76,
+    "gpuTemp": 52.625
+  },
+  {
+    "epoch": 77,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 78,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 79,
+    "gpuTemp": 52.875
+  },
+  {
+    "epoch": 80,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 81,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 82,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 83,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 84,
+    "gpuTemp": 54.375
+  },
+  {
+    "epoch": 85,
+    "gpuTemp": 54.375
+  },
+  {
+    "epoch": 86,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 87,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 88,
+    "gpuTemp": 52.875
+  },
+  {
+    "epoch": 89,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 90,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 91,
+    "gpuTemp": 53.25
+  },
+  {
+    "epoch": 92,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 93,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 94,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 95,
+    "gpuTemp": 52.875
+  },
+  {
+    "epoch": 96,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 97,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 98,
+    "gpuTemp": 54
+  },
+  {
+    "epoch": 99,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 100,
+    "gpuTemp": 54.75
+  },
+  {
+    "epoch": 101,
+    "gpuTemp": 52.875
+  },
+  {
+    "epoch": 102,
+    "gpuTemp": 54
+  },
+  {
+    "epoch": 103,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 104,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 105,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 106,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 107,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 108,
+    "gpuTemp": 54.75
+  },
+  {
+    "epoch": 109,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 110,
+    "gpuTemp": 54
+  },
+  {
+    "epoch": 111,
+    "gpuTemp": 52.75
+  },
+  {
+    "epoch": 112,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 113,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 114,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 115,
+    "gpuTemp": 54.625
+  },
+  {
+    "epoch": 116,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 117,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 118,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 119,
+    "gpuTemp": 54.625
+  },
+  {
+    "epoch": 120,
+    "gpuTemp": 54.75
+  },
+  {
+    "epoch": 121,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 122,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 123,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 124,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 125,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 126,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 127,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 128,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 129,
+    "gpuTemp": 53.75
+  },
+  {
+    "epoch": 130,
+    "gpuTemp": 52.875
+  },
+  {
+    "epoch": 131,
+    "gpuTemp": 53.125
+  },
+  {
+    "epoch": 132,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 133,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 134,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 135,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 136,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 137,
+    "gpuTemp": 53.875
+  },
+  {
+    "epoch": 138,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 139,
+    "gpuTemp": 53.375
+  },
+  {
+    "epoch": 140,
+    "gpuTemp": 53
+  },
+  {
+    "epoch": 141,
+    "gpuTemp": 52.75
+  },
+  {
+    "epoch": 142,
+    "gpuTemp": 53.5
+  },
+  {
+    "epoch": 143,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 144,
+    "gpuTemp": 54.125
+  },
+  {
+    "epoch": 145,
+    "gpuTemp": 54.75
+  },
+  {
+    "epoch": 146,
+    "gpuTemp": 54.25
+  },
+  {
+    "epoch": 147,
+    "gpuTemp": 54
+  },
+  {
+    "epoch": 148,
+    "gpuTemp": 52.5
+  },
+  {
+    "epoch": 149,
+    "gpuTemp": 53.625
+  },
+  {
+    "epoch": 150,
+    "gpuTemp": 52.75
+  }
+]

@@ -1,0 +1,810 @@
+[
+  {
+    "x": 0,
+    "Harrypotter (class-0)": 0.010002,
+    "Hermionegranger (class-1)": 0.022933,
+    "Batman (class-2)": 0.012549,
+    "Flash (class-3)": 0.03839,
+    "all (92.5%) (mean)": 0.3689479090909091
+  },
+  {
+    "x": 0.01,
+    "Harrypotter (class-0)": 0.654048,
+    "Hermionegranger (class-1)": 0.709467,
+    "Batman (class-2)": 0.578092,
+    "Flash (class-3)": 0.732732,
+    "all (92.5%) (mean)": 0.4455742727272727
+  },
+  {
+    "x": 0.02,
+    "Harrypotter (class-0)": 0.732441,
+    "Hermionegranger (class-1)": 0.832026,
+    "Batman (class-2)": 0.666187,
+    "Flash (class-3)": 0.841744,
+    "all (92.5%) (mean)": 0.5229336363636363
+  },
+  {
+    "x": 0.03,
+    "Harrypotter (class-0)": 0.772353,
+    "Hermionegranger (class-1)": 0.861928,
+    "Batman (class-2)": 0.737303,
+    "Flash (class-3)": 0.872931,
+    "all (92.5%) (mean)": 0.6007992727272726
+  },
+  {
+    "x": 0.04,
+    "Harrypotter (class-0)": 0.821245,
+    "Hermionegranger (class-1)": 0.868357,
+    "Batman (class-2)": 0.74818,
+    "Flash (class-3)": 0.901795,
+    "all (92.5%) (mean)": 0.679237
+  },
+  {
+    "x": 0.05,
+    "Harrypotter (class-0)": 0.84153,
+    "Hermionegranger (class-1)": 0.879947,
+    "Batman (class-2)": 0.76258,
+    "Flash (class-3)": 0.915566,
+    "all (92.5%) (mean)": 0.7578693636363636
+  },
+  {
+    "x": 0.06,
+    "Harrypotter (class-0)": 0.853524,
+    "Hermionegranger (class-1)": 0.896413,
+    "Batman (class-2)": 0.782109,
+    "Flash (class-3)": 0.923389,
+    "all (92.5%) (mean)": 0.8366903636363635
+  },
+  {
+    "x": 0.07,
+    "Harrypotter (class-0)": 0.860852,
+    "Hermionegranger (class-1)": 0.9032,
+    "Batman (class-2)": 0.786689,
+    "Flash (class-3)": 0.936948,
+    "all (92.5%) (mean)": 0.8568337272727273
+  },
+  {
+    "x": 0.08,
+    "Harrypotter (class-0)": 0.866823,
+    "Hermionegranger (class-1)": 0.911559,
+    "Batman (class-2)": 0.791225,
+    "Flash (class-3)": 0.940358,
+    "all (92.5%) (mean)": 0.868135181818182
+  },
+  {
+    "x": 0.09,
+    "Harrypotter (class-0)": 0.870254,
+    "Hermionegranger (class-1)": 0.917169,
+    "Batman (class-2)": 0.80621,
+    "Flash (class-3)": 0.941502,
+    "all (92.5%) (mean)": 0.8757284545454547
+  },
+  {
+    "x": 0.1,
+    "Harrypotter (class-0)": 0.873661,
+    "Hermionegranger (class-1)": 0.918422,
+    "Batman (class-2)": 0.808972,
+    "Flash (class-3)": 0.942644,
+    "all (92.5%) (mean)": 0.8814160909090909
+  },
+  {
+    "x": 0.11,
+    "Harrypotter (class-0)": 0.877046,
+    "Hermionegranger (class-1)": 0.919672,
+    "Batman (class-2)": 0.8115,
+    "Flash (class-3)": 0.943783,
+    "all (92.5%) (mean)": 0.8860854545454544
+  },
+  {
+    "x": 0.12,
+    "Harrypotter (class-0)": 0.880795,
+    "Hermionegranger (class-1)": 0.920919,
+    "Batman (class-2)": 0.814015,
+    "Flash (class-3)": 0.94492,
+    "all (92.5%) (mean)": 0.889755
+  },
+  {
+    "x": 0.13,
+    "Harrypotter (class-0)": 0.884927,
+    "Hermionegranger (class-1)": 0.922164,
+    "Batman (class-2)": 0.816516,
+    "Flash (class-3)": 0.946054,
+    "all (92.5%) (mean)": 0.8928630909090907
+  },
+  {
+    "x": 0.14,
+    "Harrypotter (class-0)": 0.889025,
+    "Hermionegranger (class-1)": 0.923405,
+    "Batman (class-2)": 0.819003,
+    "Flash (class-3)": 0.947185,
+    "all (92.5%) (mean)": 0.8956150909090909
+  },
+  {
+    "x": 0.15,
+    "Harrypotter (class-0)": 0.89396,
+    "Hermionegranger (class-1)": 0.924644,
+    "Batman (class-2)": 0.822913,
+    "Flash (class-3)": 0.948314,
+    "all (92.5%) (mean)": 0.897944
+  },
+  {
+    "x": 0.16,
+    "Harrypotter (class-0)": 0.90244,
+    "Hermionegranger (class-1)": 0.925879,
+    "Batman (class-2)": 0.827316,
+    "Flash (class-3)": 0.94944,
+    "all (92.5%) (mean)": 0.9002229090909091
+  },
+  {
+    "x": 0.17,
+    "Harrypotter (class-0)": 0.907542,
+    "Hermionegranger (class-1)": 0.927112,
+    "Batman (class-2)": 0.831676,
+    "Flash (class-3)": 0.950564,
+    "all (92.5%) (mean)": 0.9024572727272727
+  },
+  {
+    "x": 0.18,
+    "Harrypotter (class-0)": 0.909903,
+    "Hermionegranger (class-1)": 0.928342,
+    "Batman (class-2)": 0.834515,
+    "Flash (class-3)": 0.951685,
+    "all (92.5%) (mean)": 0.904627
+  },
+  {
+    "x": 0.19,
+    "Harrypotter (class-0)": 0.912253,
+    "Hermionegranger (class-1)": 0.92957,
+    "Batman (class-2)": 0.836424,
+    "Flash (class-3)": 0.952804,
+    "all (92.5%) (mean)": 0.9067054545454546
+  },
+  {
+    "x": 0.2,
+    "Harrypotter (class-0)": 0.914591,
+    "Hermionegranger (class-1)": 0.930783,
+    "Batman (class-2)": 0.838325,
+    "Flash (class-3)": 0.953907,
+    "all (92.5%) (mean)": 0.9086979090909092
+  },
+  {
+    "x": 0.21,
+    "Harrypotter (class-0)": 0.916918,
+    "Hermionegranger (class-1)": 0.931993,
+    "Batman (class-2)": 0.840217,
+    "Flash (class-3)": 0.954842,
+    "all (92.5%) (mean)": 0.9105812727272729
+  },
+  {
+    "x": 0.22,
+    "Harrypotter (class-0)": 0.919234,
+    "Hermionegranger (class-1)": 0.933201,
+    "Batman (class-2)": 0.842102,
+    "Flash (class-3)": 0.955775,
+    "all (92.5%) (mean)": 0.9122632727272727
+  },
+  {
+    "x": 0.23,
+    "Harrypotter (class-0)": 0.921026,
+    "Hermionegranger (class-1)": 0.934406,
+    "Batman (class-2)": 0.843978,
+    "Flash (class-3)": 0.956706,
+    "all (92.5%) (mean)": 0.9138210000000003
+  },
+  {
+    "x": 0.24,
+    "Harrypotter (class-0)": 0.922021,
+    "Hermionegranger (class-1)": 0.935608,
+    "Batman (class-2)": 0.845846,
+    "Flash (class-3)": 0.957636,
+    "all (92.5%) (mean)": 0.9153508181818182
+  },
+  {
+    "x": 0.25,
+    "Harrypotter (class-0)": 0.923013,
+    "Hermionegranger (class-1)": 0.936807,
+    "Batman (class-2)": 0.847903,
+    "Flash (class-3)": 0.958563,
+    "all (92.5%) (mean)": 0.9168489999999999
+  },
+  {
+    "x": 0.26,
+    "Harrypotter (class-0)": 0.924004,
+    "Hermionegranger (class-1)": 0.938004,
+    "Batman (class-2)": 0.851204,
+    "Flash (class-3)": 0.959489,
+    "all (92.5%) (mean)": 0.9181950909090909
+  },
+  {
+    "x": 0.27,
+    "Harrypotter (class-0)": 0.924992,
+    "Hermionegranger (class-1)": 0.939198,
+    "Batman (class-2)": 0.85448,
+    "Flash (class-3)": 0.960413,
+    "all (92.5%) (mean)": 0.9193835454545454
+  },
+  {
+    "x": 0.28,
+    "Harrypotter (class-0)": 0.925979,
+    "Hermionegranger (class-1)": 0.94039,
+    "Batman (class-2)": 0.857731,
+    "Flash (class-3)": 0.961335,
+    "all (92.5%) (mean)": 0.9204140909090909
+  },
+  {
+    "x": 0.29,
+    "Harrypotter (class-0)": 0.926963,
+    "Hermionegranger (class-1)": 0.941579,
+    "Batman (class-2)": 0.860959,
+    "Flash (class-3)": 0.962256,
+    "all (92.5%) (mean)": 0.92131
+  },
+  {
+    "x": 0.3,
+    "Harrypotter (class-0)": 0.927945,
+    "Hermionegranger (class-1)": 0.942765,
+    "Batman (class-2)": 0.863086,
+    "Flash (class-3)": 0.963175,
+    "all (92.5%) (mean)": 0.9221814545454543
+  },
+  {
+    "x": 0.31,
+    "Harrypotter (class-0)": 0.928926,
+    "Hermionegranger (class-1)": 0.939181,
+    "Batman (class-2)": 0.864637,
+    "Flash (class-3)": 0.964092,
+    "all (92.5%) (mean)": 0.9230242727272727
+  },
+  {
+    "x": 0.32,
+    "Harrypotter (class-0)": 0.929904,
+    "Hermionegranger (class-1)": 0.93517,
+    "Batman (class-2)": 0.866182,
+    "Flash (class-3)": 0.965007,
+    "all (92.5%) (mean)": 0.9237428181818181
+  },
+  {
+    "x": 0.33,
+    "Harrypotter (class-0)": 0.93088,
+    "Hermionegranger (class-1)": 0.931135,
+    "Batman (class-2)": 0.867721,
+    "Flash (class-3)": 0.965921,
+    "all (92.5%) (mean)": 0.9243104545454546
+  },
+  {
+    "x": 0.34,
+    "Harrypotter (class-0)": 0.931854,
+    "Hermionegranger (class-1)": 0.927594,
+    "Batman (class-2)": 0.869255,
+    "Flash (class-3)": 0.966833,
+    "all (92.5%) (mean)": 0.9246727272727273
+  },
+  {
+    "x": 0.35,
+    "Harrypotter (class-0)": 0.932826,
+    "Hermionegranger (class-1)": 0.928105,
+    "Batman (class-2)": 0.870783,
+    "Flash (class-3)": 0.967743,
+    "all (92.5%) (mean)": 0.9246495454545456
+  },
+  {
+    "x": 0.36,
+    "Harrypotter (class-0)": 0.933797,
+    "Hermionegranger (class-1)": 0.928615,
+    "Batman (class-2)": 0.872306,
+    "Flash (class-3)": 0.968652,
+    "all (92.5%) (mean)": 0.9242084545454545
+  },
+  {
+    "x": 0.37,
+    "Harrypotter (class-0)": 0.934765,
+    "Hermionegranger (class-1)": 0.929125,
+    "Batman (class-2)": 0.873823,
+    "Flash (class-3)": 0.966604,
+    "all (92.5%) (mean)": 0.9235975454545453
+  },
+  {
+    "x": 0.38,
+    "Harrypotter (class-0)": 0.934904,
+    "Hermionegranger (class-1)": 0.929634,
+    "Batman (class-2)": 0.875335,
+    "Flash (class-3)": 0.964187,
+    "all (92.5%) (mean)": 0.9229443636363637
+  },
+  {
+    "x": 0.39,
+    "Harrypotter (class-0)": 0.932632,
+    "Hermionegranger (class-1)": 0.930143,
+    "Batman (class-2)": 0.876842,
+    "Flash (class-3)": 0.961759,
+    "all (92.5%) (mean)": 0.9222474545454545
+  },
+  {
+    "x": 0.4,
+    "Harrypotter (class-0)": 0.930351,
+    "Hermionegranger (class-1)": 0.930651,
+    "Batman (class-2)": 0.870414,
+    "Flash (class-3)": 0.959321,
+    "all (92.5%) (mean)": 0.9214950909090909
+  },
+  {
+    "x": 0.41,
+    "Harrypotter (class-0)": 0.928062,
+    "Hermionegranger (class-1)": 0.931159,
+    "Batman (class-2)": 0.861471,
+    "Flash (class-3)": 0.956872,
+    "all (92.5%) (mean)": 0.9206134545454545
+  },
+  {
+    "x": 0.42,
+    "Harrypotter (class-0)": 0.925764,
+    "Hermionegranger (class-1)": 0.931666,
+    "Batman (class-2)": 0.858113,
+    "Flash (class-3)": 0.954412,
+    "all (92.5%) (mean)": 0.9196116363636363
+  },
+  {
+    "x": 0.43,
+    "Harrypotter (class-0)": 0.923457,
+    "Hermionegranger (class-1)": 0.932173,
+    "Batman (class-2)": 0.859969,
+    "Flash (class-3)": 0.951925,
+    "all (92.5%) (mean)": 0.9185567272727272
+  },
+  {
+    "x": 0.44,
+    "Harrypotter (class-0)": 0.921142,
+    "Hermionegranger (class-1)": 0.932679,
+    "Batman (class-2)": 0.861817,
+    "Flash (class-3)": 0.949354,
+    "all (92.5%) (mean)": 0.9174755454545455
+  },
+  {
+    "x": 0.45,
+    "Harrypotter (class-0)": 0.918818,
+    "Hermionegranger (class-1)": 0.933185,
+    "Batman (class-2)": 0.863657,
+    "Flash (class-3)": 0.946771,
+    "all (92.5%) (mean)": 0.9164286363636365
+  },
+  {
+    "x": 0.46,
+    "Harrypotter (class-0)": 0.917311,
+    "Hermionegranger (class-1)": 0.93369,
+    "Batman (class-2)": 0.865488,
+    "Flash (class-3)": 0.944176,
+    "all (92.5%) (mean)": 0.9153873636363637
+  },
+  {
+    "x": 0.47,
+    "Harrypotter (class-0)": 0.91622,
+    "Hermionegranger (class-1)": 0.934195,
+    "Batman (class-2)": 0.86731,
+    "Flash (class-3)": 0.941569,
+    "all (92.5%) (mean)": 0.9144011818181818
+  },
+  {
+    "x": 0.48,
+    "Harrypotter (class-0)": 0.915128,
+    "Hermionegranger (class-1)": 0.934699,
+    "Batman (class-2)": 0.869124,
+    "Flash (class-3)": 0.93895,
+    "all (92.5%) (mean)": 0.9131983636363636
+  },
+  {
+    "x": 0.49,
+    "Harrypotter (class-0)": 0.914034,
+    "Hermionegranger (class-1)": 0.935203,
+    "Batman (class-2)": 0.87093,
+    "Flash (class-3)": 0.936319,
+    "all (92.5%) (mean)": 0.9117399090909092
+  },
+  {
+    "x": 0.5,
+    "Harrypotter (class-0)": 0.912937,
+    "Hermionegranger (class-1)": 0.935706,
+    "Batman (class-2)": 0.87248,
+    "Flash (class-3)": 0.934189,
+    "all (92.5%) (mean)": 0.9102986363636364
+  },
+  {
+    "x": 0.51,
+    "Harrypotter (class-0)": 0.911839,
+    "Hermionegranger (class-1)": 0.936208,
+    "Batman (class-2)": 0.864584,
+    "Flash (class-3)": 0.932289,
+    "all (92.5%) (mean)": 0.9088749090909093
+  },
+  {
+    "x": 0.52,
+    "Harrypotter (class-0)": 0.910739,
+    "Hermionegranger (class-1)": 0.936711,
+    "Batman (class-2)": 0.856339,
+    "Flash (class-3)": 0.930382,
+    "all (92.5%) (mean)": 0.9074505454545453
+  },
+  {
+    "x": 0.53,
+    "Harrypotter (class-0)": 0.909637,
+    "Hermionegranger (class-1)": 0.937212,
+    "Batman (class-2)": 0.841713,
+    "Flash (class-3)": 0.92847,
+    "all (92.5%) (mean)": 0.9060162727272728
+  },
+  {
+    "x": 0.54,
+    "Harrypotter (class-0)": 0.908533,
+    "Hermionegranger (class-1)": 0.937713,
+    "Batman (class-2)": 0.830554,
+    "Flash (class-3)": 0.926551,
+    "all (92.5%) (mean)": 0.9046125454545456
+  },
+  {
+    "x": 0.55,
+    "Harrypotter (class-0)": 0.907427,
+    "Hermionegranger (class-1)": 0.938214,
+    "Batman (class-2)": 0.831308,
+    "Flash (class-3)": 0.924625,
+    "all (92.5%) (mean)": 0.9032664545454545
+  },
+  {
+    "x": 0.56,
+    "Harrypotter (class-0)": 0.906319,
+    "Hermionegranger (class-1)": 0.938714,
+    "Batman (class-2)": 0.832061,
+    "Flash (class-3)": 0.922693,
+    "all (92.5%) (mean)": 0.9019870909090911
+  },
+  {
+    "x": 0.57,
+    "Harrypotter (class-0)": 0.905209,
+    "Hermionegranger (class-1)": 0.939214,
+    "Batman (class-2)": 0.832812,
+    "Flash (class-3)": 0.920755,
+    "all (92.5%) (mean)": 0.9010595454545457
+  },
+  {
+    "x": 0.58,
+    "Harrypotter (class-0)": 0.904098,
+    "Hermionegranger (class-1)": 0.939713,
+    "Batman (class-2)": 0.833561,
+    "Flash (class-3)": 0.91881,
+    "all (92.5%) (mean)": 0.8996816363636365
+  },
+  {
+    "x": 0.59,
+    "Harrypotter (class-0)": 0.902984,
+    "Hermionegranger (class-1)": 0.940212,
+    "Batman (class-2)": 0.834308,
+    "Flash (class-3)": 0.918632,
+    "all (92.5%) (mean)": 0.8983795454545453
+  },
+  {
+    "x": 0.6,
+    "Harrypotter (class-0)": 0.901868,
+    "Hermionegranger (class-1)": 0.94071,
+    "Batman (class-2)": 0.835054,
+    "Flash (class-3)": 0.919627,
+    "all (92.5%) (mean)": 0.897205090909091
+  },
+  {
+    "x": 0.61,
+    "Harrypotter (class-0)": 0.90075,
+    "Hermionegranger (class-1)": 0.941851,
+    "Batman (class-2)": 0.835798,
+    "Flash (class-3)": 0.92062,
+    "all (92.5%) (mean)": 0.8959189999999999
+  },
+  {
+    "x": 0.62,
+    "Harrypotter (class-0)": 0.893428,
+    "Hermionegranger (class-1)": 0.952528,
+    "Batman (class-2)": 0.83654,
+    "Flash (class-3)": 0.92161,
+    "all (92.5%) (mean)": 0.8944908181818184
+  },
+  {
+    "x": 0.63,
+    "Harrypotter (class-0)": 0.878866,
+    "Hermionegranger (class-1)": 0.934797,
+    "Batman (class-2)": 0.837281,
+    "Flash (class-3)": 0.922598,
+    "all (92.5%) (mean)": 0.8929181818181818
+  },
+  {
+    "x": 0.64,
+    "Harrypotter (class-0)": 0.872635,
+    "Hermionegranger (class-1)": 0.925498,
+    "Batman (class-2)": 0.838021,
+    "Flash (class-3)": 0.923584,
+    "all (92.5%) (mean)": 0.8913128181818183
+  },
+  {
+    "x": 0.65,
+    "Harrypotter (class-0)": 0.866343,
+    "Hermionegranger (class-1)": 0.922007,
+    "Batman (class-2)": 0.838758,
+    "Flash (class-3)": 0.924567,
+    "all (92.5%) (mean)": 0.8896423636363636
+  },
+  {
+    "x": 0.66,
+    "Harrypotter (class-0)": 0.859383,
+    "Hermionegranger (class-1)": 0.920562,
+    "Batman (class-2)": 0.839495,
+    "Flash (class-3)": 0.925547,
+    "all (92.5%) (mean)": 0.8878796363636362
+  },
+  {
+    "x": 0.67,
+    "Harrypotter (class-0)": 0.851078,
+    "Hermionegranger (class-1)": 0.919114,
+    "Batman (class-2)": 0.840229,
+    "Flash (class-3)": 0.926526,
+    "all (92.5%) (mean)": 0.8860096363636363
+  },
+  {
+    "x": 0.68,
+    "Harrypotter (class-0)": 0.84267,
+    "Hermionegranger (class-1)": 0.917663,
+    "Batman (class-2)": 0.840962,
+    "Flash (class-3)": 0.927502,
+    "all (92.5%) (mean)": 0.8839562727272727
+  },
+  {
+    "x": 0.69,
+    "Harrypotter (class-0)": 0.839171,
+    "Hermionegranger (class-1)": 0.916208,
+    "Batman (class-2)": 0.841693,
+    "Flash (class-3)": 0.928476,
+    "all (92.5%) (mean)": 0.8825225454545454
+  },
+  {
+    "x": 0.7,
+    "Harrypotter (class-0)": 0.836015,
+    "Hermionegranger (class-1)": 0.91475,
+    "Batman (class-2)": 0.842423,
+    "Flash (class-3)": 0.929447,
+    "all (92.5%) (mean)": 0.8808246363636362
+  },
+  {
+    "x": 0.71,
+    "Harrypotter (class-0)": 0.832843,
+    "Hermionegranger (class-1)": 0.913288,
+    "Batman (class-2)": 0.843151,
+    "Flash (class-3)": 0.930417,
+    "all (92.5%) (mean)": 0.8788838181818182
+  },
+  {
+    "x": 0.72,
+    "Harrypotter (class-0)": 0.829657,
+    "Hermionegranger (class-1)": 0.911822,
+    "Batman (class-2)": 0.843878,
+    "Flash (class-3)": 0.931384,
+    "all (92.5%) (mean)": 0.8765981818181818
+  },
+  {
+    "x": 0.73,
+    "Harrypotter (class-0)": 0.826455,
+    "Hermionegranger (class-1)": 0.910354,
+    "Batman (class-2)": 0.844603,
+    "Flash (class-3)": 0.932348,
+    "all (92.5%) (mean)": 0.8740473636363638
+  },
+  {
+    "x": 0.74,
+    "Harrypotter (class-0)": 0.823238,
+    "Hermionegranger (class-1)": 0.908881,
+    "Batman (class-2)": 0.845326,
+    "Flash (class-3)": 0.933016,
+    "all (92.5%) (mean)": 0.87163
+  },
+  {
+    "x": 0.75,
+    "Harrypotter (class-0)": 0.816892,
+    "Hermionegranger (class-1)": 0.907405,
+    "Batman (class-2)": 0.846048,
+    "Flash (class-3)": 0.914685,
+    "all (92.5%) (mean)": 0.8688933636363636
+  },
+  {
+    "x": 0.76,
+    "Harrypotter (class-0)": 0.806458,
+    "Hermionegranger (class-1)": 0.904828,
+    "Batman (class-2)": 0.844209,
+    "Flash (class-3)": 0.910785,
+    "all (92.5%) (mean)": 0.8661380000000001
+  },
+  {
+    "x": 0.77,
+    "Harrypotter (class-0)": 0.797357,
+    "Hermionegranger (class-1)": 0.898285,
+    "Batman (class-2)": 0.841922,
+    "Flash (class-3)": 0.906857,
+    "all (92.5%) (mean)": 0.8626095454545456
+  },
+  {
+    "x": 0.78,
+    "Harrypotter (class-0)": 0.79051,
+    "Hermionegranger (class-1)": 0.891673,
+    "Batman (class-2)": 0.839627,
+    "Flash (class-3)": 0.902901,
+    "all (92.5%) (mean)": 0.8580316363636363
+  },
+  {
+    "x": 0.79,
+    "Harrypotter (class-0)": 0.783596,
+    "Hermionegranger (class-1)": 0.902596,
+    "Batman (class-2)": 0.837323,
+    "Flash (class-3)": 0.898916,
+    "all (92.5%) (mean)": 0.8521093636363637
+  },
+  {
+    "x": 0.8,
+    "Harrypotter (class-0)": 0.779373,
+    "Hermionegranger (class-1)": 0.895834,
+    "Batman (class-2)": 0.835011,
+    "Flash (class-3)": 0.894919,
+    "all (92.5%) (mean)": 0.8445572727272725
+  },
+  {
+    "x": 0.81,
+    "Harrypotter (class-0)": 0.7888,
+    "Hermionegranger (class-1)": 0.888993,
+    "Batman (class-2)": 0.83269,
+    "Flash (class-3)": 0.890917,
+    "all (92.5%) (mean)": 0.8354764545454546
+  },
+  {
+    "x": 0.82,
+    "Harrypotter (class-0)": 0.767331,
+    "Hermionegranger (class-1)": 0.879871,
+    "Batman (class-2)": 0.830361,
+    "Flash (class-3)": 0.886885,
+    "all (92.5%) (mean)": 0.8253945454545455
+  },
+  {
+    "x": 0.83,
+    "Harrypotter (class-0)": 0.736523,
+    "Hermionegranger (class-1)": 0.867939,
+    "Batman (class-2)": 0.828024,
+    "Flash (class-3)": 0.882825,
+    "all (92.5%) (mean)": 0.8136554545454545
+  },
+  {
+    "x": 0.84,
+    "Harrypotter (class-0)": 0.690609,
+    "Hermionegranger (class-1)": 0.858158,
+    "Batman (class-2)": 0.825677,
+    "Flash (class-3)": 0.878735,
+    "all (92.5%) (mean)": 0.8005216363636364
+  },
+  {
+    "x": 0.85,
+    "Harrypotter (class-0)": 0.663455,
+    "Hermionegranger (class-1)": 0.848504,
+    "Batman (class-2)": 0.817556,
+    "Flash (class-3)": 0.848653,
+    "all (92.5%) (mean)": 0.7840376363636363
+  },
+  {
+    "x": 0.86,
+    "Harrypotter (class-0)": 0.6459,
+    "Hermionegranger (class-1)": 0.826142,
+    "Batman (class-2)": 0.779269,
+    "Flash (class-3)": 0.834166,
+    "all (92.5%) (mean)": 0.7641932727272728
+  },
+  {
+    "x": 0.87,
+    "Harrypotter (class-0)": 0.626831,
+    "Hermionegranger (class-1)": 0.813025,
+    "Batman (class-2)": 0.768527,
+    "Flash (class-3)": 0.814293,
+    "all (92.5%) (mean)": 0.7378257272727274
+  },
+  {
+    "x": 0.88,
+    "Harrypotter (class-0)": 0.575327,
+    "Hermionegranger (class-1)": 0.792125,
+    "Batman (class-2)": 0.760384,
+    "Flash (class-3)": 0.800065,
+    "all (92.5%) (mean)": 0.7046810909090909
+  },
+  {
+    "x": 0.89,
+    "Harrypotter (class-0)": 0.552565,
+    "Hermionegranger (class-1)": 0.777537,
+    "Batman (class-2)": 0.752141,
+    "Flash (class-3)": 0.764579,
+    "all (92.5%) (mean)": 0.6641180000000001
+  },
+  {
+    "x": 0.9,
+    "Harrypotter (class-0)": 0.446814,
+    "Hermionegranger (class-1)": 0.766729,
+    "Batman (class-2)": 0.754696,
+    "Flash (class-3)": 0.728895,
+    "all (92.5%) (mean)": 0.6160363636363637
+  },
+  {
+    "x": 0.91,
+    "Harrypotter (class-0)": 0.426109,
+    "Hermionegranger (class-1)": 0.729383,
+    "Batman (class-2)": 0.715864,
+    "Flash (class-3)": 0.660626,
+    "all (92.5%) (mean)": 0.5515384545454546
+  },
+  {
+    "x": 0.92,
+    "Harrypotter (class-0)": 0.401058,
+    "Hermionegranger (class-1)": 0.637692,
+    "Batman (class-2)": 0.672701,
+    "Flash (class-3)": 0.529778,
+    "all (92.5%) (mean)": 0.4832360000000001
+  },
+  {
+    "x": 0.93,
+    "Harrypotter (class-0)": 0.349299,
+    "Hermionegranger (class-1)": 0.520933,
+    "Batman (class-2)": 0.648129,
+    "Flash (class-3)": 0.387721,
+    "all (92.5%) (mean)": 0.4145388181818182
+  },
+  {
+    "x": 0.94,
+    "Harrypotter (class-0)": 0.251484,
+    "Hermionegranger (class-1)": 0.445967,
+    "Batman (class-2)": 0.542896,
+    "Flash (class-3)": 0.290189,
+    "all (92.5%) (mean)": 0.34799563636363634
+  },
+  {
+    "x": 0.95,
+    "Harrypotter (class-0)": 0.14899,
+    "Hermionegranger (class-1)": 0.31046,
+    "Batman (class-2)": 0.458614,
+    "Flash (class-3)": 0.219522,
+    "all (92.5%) (mean)": 0.28329509090909094
+  },
+  {
+    "x": 0.96,
+    "Harrypotter (class-0)": 0,
+    "Hermionegranger (class-1)": 0,
+    "Batman (class-2)": 0.228736,
+    "Flash (class-3)": 0.111522,
+    "all (92.5%) (mean)": 0.22199654545454547
+  },
+  {
+    "x": 0.97,
+    "Harrypotter (class-0)": 0,
+    "Hermionegranger (class-1)": 0,
+    "Batman (class-2)": 0,
+    "Flash (class-3)": 0.080166,
+    "all (92.5%) (mean)": 0.1644514545454545
+  },
+  {
+    "x": 0.98,
+    "Harrypotter (class-0)": 0,
+    "Hermionegranger (class-1)": 0,
+    "Batman (class-2)": 0,
+    "Flash (class-3)": 0,
+    "all (92.5%) (mean)": 0.11351445454545452
+  },
+  {
+    "x": 0.99,
+    "Harrypotter (class-0)": 0,
+    "Hermionegranger (class-1)": 0,
+    "Batman (class-2)": 0,
+    "Flash (class-3)": 0,
+    "all (92.5%) (mean)": 0.07019436363636362
+  },
+  {
+    "x": 1,
+    "Harrypotter (class-0)": 0,
+    "Hermionegranger (class-1)": 0,
+    "Batman (class-2)": 0,
+    "Flash (class-3)": 0,
+    "all (92.5%) (mean)": 0.03540945454545455
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "label": "1 MB",
+    "value": 44
+  },
+  {
+    "label": "1.3 MB",
+    "value": 114
+  },
+  {
+    "label": "1.6 MB",
+    "value": 48
+  },
+  {
+    "label": "1.9 MB",
+    "value": 46
+  },
+  {
+    "label": "2.1 MB",
+    "value": 26
+  },
+  {
+    "label": "2.4 MB",
+    "value": 13
+  },
+  {
+    "label": "2.7 MB",
+    "value": 2
+  },
+  {
+    "label": "3 MB",
+    "value": 4
+  },
+  {
+    "label": "3.6 MB",
+    "value": 3
+  }
+]

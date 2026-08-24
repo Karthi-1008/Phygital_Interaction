@@ -1,0 +1,26 @@
+[
+  {
+    "key": "class-1",
+    "name": "Hermionegranger",
+    "value": 172,
+    "color": "#0bdbeb"
+  },
+  {
+    "key": "class-0",
+    "name": "Harrypotter",
+    "value": 169,
+    "color": "#042aff"
+  },
+  {
+    "key": "class-3",
+    "name": "Flash",
+    "value": 160,
+    "color": "#00dfb7"
+  },
+  {
+    "key": "class-2",
+    "name": "Batman",
+    "value": 142,
+    "color": "#f3f3f3"
+  }
+]

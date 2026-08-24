@@ -1,0 +1,14 @@
+[
+  {
+    "key": "train",
+    "name": "Train",
+    "value": 240,
+    "color": "#22c55e"
+  },
+  {
+    "key": "val",
+    "name": "Validation",
+    "value": 60,
+    "color": "#3b82f6"
+  }
+]

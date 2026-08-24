@@ -1,0 +1,757 @@
+[
+  {
+    "epoch": 0,
+    "networkRecv": 0,
+    "networkSent": 0
+  },
+  {
+    "epoch": 1,
+    "networkRecv": 0.525,
+    "networkSent": 0.071
+  },
+  {
+    "epoch": 2,
+    "networkRecv": 0.07,
+    "networkSent": 0.08
+  },
+  {
+    "epoch": 3,
+    "networkRecv": 0.361,
+    "networkSent": 0.069
+  },
+  {
+    "epoch": 4,
+    "networkRecv": 0.22,
+    "networkSent": 0.025
+  },
+  {
+    "epoch": 5,
+    "networkRecv": 0.07,
+    "networkSent": 0.086
+  },
+  {
+    "epoch": 6,
+    "networkRecv": 0.082,
+    "networkSent": 0.098
+  },
+  {
+    "epoch": 7,
+    "networkRecv": 0.228,
+    "networkSent": 0.082
+  },
+  {
+    "epoch": 8,
+    "networkRecv": 0.135,
+    "networkSent": 0.135
+  },
+  {
+    "epoch": 9,
+    "networkRecv": 0.051,
+    "networkSent": 0.074
+  },
+  {
+    "epoch": 10,
+    "networkRecv": 0.284,
+    "networkSent": 0.105
+  },
+  {
+    "epoch": 11,
+    "networkRecv": 0.613,
+    "networkSent": 0.102
+  },
+  {
+    "epoch": 12,
+    "networkRecv": 0.328,
+    "networkSent": 0.1
+  },
+  {
+    "epoch": 13,
+    "networkRecv": 0.057,
+    "networkSent": 0.085
+  },
+  {
+    "epoch": 14,
+    "networkRecv": 0.252,
+    "networkSent": 0.135
+  },
+  {
+    "epoch": 15,
+    "networkRecv": 0.146,
+    "networkSent": 0.099
+  },
+  {
+    "epoch": 16,
+    "networkRecv": 0.044,
+    "networkSent": 0.051
+  },
+  {
+    "epoch": 17,
+    "networkRecv": 0.07,
+    "networkSent": 0.049
+  },
+  {
+    "epoch": 18,
+    "networkRecv": 0.887,
+    "networkSent": 0.063
+  },
+  {
+    "epoch": 19,
+    "networkRecv": 0.053,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 20,
+    "networkRecv": 0.319,
+    "networkSent": 0.063
+  },
+  {
+    "epoch": 21,
+    "networkRecv": 0.062,
+    "networkSent": 0.086
+  },
+  {
+    "epoch": 22,
+    "networkRecv": 0.241,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 23,
+    "networkRecv": 0.067,
+    "networkSent": 0.114
+  },
+  {
+    "epoch": 24,
+    "networkRecv": 0.109,
+    "networkSent": 0.081
+  },
+  {
+    "epoch": 25,
+    "networkRecv": 0.064,
+    "networkSent": 0.089
+  },
+  {
+    "epoch": 26,
+    "networkRecv": 0.07,
+    "networkSent": 0.11
+  },
+  {
+    "epoch": 27,
+    "networkRecv": 0.508,
+    "networkSent": 0.051
+  },
+  {
+    "epoch": 28,
+    "networkRecv": 0.044,
+    "networkSent": 0.062
+  },
+  {
+    "epoch": 29,
+    "networkRecv": 0.249,
+    "networkSent": 0.075
+  },
+  {
+    "epoch": 30,
+    "networkRecv": 0.376,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 31,
+    "networkRecv": 0.081,
+    "networkSent": 0.164
+  },
+  {
+    "epoch": 32,
+    "networkRecv": 0.083,
+    "networkSent": 0.092
+  },
+  {
+    "epoch": 33,
+    "networkRecv": 0.507,
+    "networkSent": 0.139
+  },
+  {
+    "epoch": 34,
+    "networkRecv": 0.08,
+    "networkSent": 0.1
+  },
+  {
+    "epoch": 35,
+    "networkRecv": 0.06,
+    "networkSent": 0.077
+  },
+  {
+    "epoch": 36,
+    "networkRecv": 0.153,
+    "networkSent": 0.06
+  },
+  {
+    "epoch": 37,
+    "networkRecv": 0.439,
+    "networkSent": 0.05
+  },
+  {
+    "epoch": 38,
+    "networkRecv": 0.054,
+    "networkSent": 0.053
+  },
+  {
+    "epoch": 39,
+    "networkRecv": 0.09,
+    "networkSent": 0.124
+  },
+  {
+    "epoch": 40,
+    "networkRecv": 0.258,
+    "networkSent": 0.103
+  },
+  {
+    "epoch": 41,
+    "networkRecv": 0.053,
+    "networkSent": 0.067
+  },
+  {
+    "epoch": 42,
+    "networkRecv": 0.052,
+    "networkSent": 0.045
+  },
+  {
+    "epoch": 43,
+    "networkRecv": 0.308,
+    "networkSent": 0.04
+  },
+  {
+    "epoch": 44,
+    "networkRecv": 0.918,
+    "networkSent": 0.108
+  },
+  {
+    "epoch": 45,
+    "networkRecv": 0.897,
+    "networkSent": 0.157
+  },
+  {
+    "epoch": 46,
+    "networkRecv": 0.04,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 47,
+    "networkRecv": 0.066,
+    "networkSent": 0.057
+  },
+  {
+    "epoch": 48,
+    "networkRecv": 0.041,
+    "networkSent": 0.033
+  },
+  {
+    "epoch": 49,
+    "networkRecv": 0.037,
+    "networkSent": 0.037
+  },
+  {
+    "epoch": 50,
+    "networkRecv": 0.292,
+    "networkSent": 0.055
+  },
+  {
+    "epoch": 51,
+    "networkRecv": 1.376,
+    "networkSent": 0.058
+  },
+  {
+    "epoch": 52,
+    "networkRecv": 0.607,
+    "networkSent": 0.07
+  },
+  {
+    "epoch": 53,
+    "networkRecv": 0.622,
+    "networkSent": 0.051
+  },
+  {
+    "epoch": 54,
+    "networkRecv": 0.033,
+    "networkSent": 0.037
+  },
+  {
+    "epoch": 55,
+    "networkRecv": 0.052,
+    "networkSent": 0.038
+  },
+  {
+    "epoch": 56,
+    "networkRecv": 0.05,
+    "networkSent": 0.038
+  },
+  {
+    "epoch": 57,
+    "networkRecv": 0.12,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 58,
+    "networkRecv": 0.07,
+    "networkSent": 0.045
+  },
+  {
+    "epoch": 59,
+    "networkRecv": 0.034,
+    "networkSent": 0.033
+  },
+  {
+    "epoch": 60,
+    "networkRecv": 0.069,
+    "networkSent": 0.053
+  },
+  {
+    "epoch": 61,
+    "networkRecv": 0.069,
+    "networkSent": 0.045
+  },
+  {
+    "epoch": 62,
+    "networkRecv": 0.064,
+    "networkSent": 0.052
+  },
+  {
+    "epoch": 63,
+    "networkRecv": 0.248,
+    "networkSent": 0.029
+  },
+  {
+    "epoch": 64,
+    "networkRecv": 0.055,
+    "networkSent": 0.061
+  },
+  {
+    "epoch": 65,
+    "networkRecv": 0.036,
+    "networkSent": 0.034
+  },
+  {
+    "epoch": 66,
+    "networkRecv": 0.087,
+    "networkSent": 0.053
+  },
+  {
+    "epoch": 67,
+    "networkRecv": 0.065,
+    "networkSent": 0.066
+  },
+  {
+    "epoch": 68,
+    "networkRecv": 0.045,
+    "networkSent": 0.056
+  },
+  {
+    "epoch": 69,
+    "networkRecv": 0.268,
+    "networkSent": 0.034
+  },
+  {
+    "epoch": 70,
+    "networkRecv": 0.058,
+    "networkSent": 0.082
+  },
+  {
+    "epoch": 71,
+    "networkRecv": 0.82,
+    "networkSent": 0.055
+  },
+  {
+    "epoch": 72,
+    "networkRecv": 0.11,
+    "networkSent": 0.091
+  },
+  {
+    "epoch": 73,
+    "networkRecv": 0.062,
+    "networkSent": 0.094
+  },
+  {
+    "epoch": 74,
+    "networkRecv": 0.331,
+    "networkSent": 0.09
+  },
+  {
+    "epoch": 75,
+    "networkRecv": 0.041,
+    "networkSent": 0.034
+  },
+  {
+    "epoch": 76,
+    "networkRecv": 0.519,
+    "networkSent": 0.069
+  },
+  {
+    "epoch": 77,
+    "networkRecv": 1.516,
+    "networkSent": 0.119
+  },
+  {
+    "epoch": 78,
+    "networkRecv": 0.088,
+    "networkSent": 0.07
+  },
+  {
+    "epoch": 79,
+    "networkRecv": 0.299,
+    "networkSent": 0.122
+  },
+  {
+    "epoch": 80,
+    "networkRecv": 0.49,
+    "networkSent": 0.062
+  },
+  {
+    "epoch": 81,
+    "networkRecv": 0.58,
+    "networkSent": 0.076
+  },
+  {
+    "epoch": 82,
+    "networkRecv": 0.076,
+    "networkSent": 0.103
+  },
+  {
+    "epoch": 83,
+    "networkRecv": 0.266,
+    "networkSent": 0.052
+  },
+  {
+    "epoch": 84,
+    "networkRecv": 0.287,
+    "networkSent": 0.054
+  },
+  {
+    "epoch": 85,
+    "networkRecv": 0.846,
+    "networkSent": 0.056
+  },
+  {
+    "epoch": 86,
+    "networkRecv": 0.831,
+    "networkSent": 0.075
+  },
+  {
+    "epoch": 87,
+    "networkRecv": 0.083,
+    "networkSent": 0.041
+  },
+  {
+    "epoch": 88,
+    "networkRecv": 0.046,
+    "networkSent": 0.039
+  },
+  {
+    "epoch": 89,
+    "networkRecv": 0.066,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 90,
+    "networkRecv": 0.035,
+    "networkSent": 0.048
+  },
+  {
+    "epoch": 91,
+    "networkRecv": 0.038,
+    "networkSent": 0.043
+  },
+  {
+    "epoch": 92,
+    "networkRecv": 0.072,
+    "networkSent": 0.043
+  },
+  {
+    "epoch": 93,
+    "networkRecv": 0.492,
+    "networkSent": 0.041
+  },
+  {
+    "epoch": 94,
+    "networkRecv": 0.81,
+    "networkSent": 0.059
+  },
+  {
+    "epoch": 95,
+    "networkRecv": 0.049,
+    "networkSent": 0.048
+  },
+  {
+    "epoch": 96,
+    "networkRecv": 0.041,
+    "networkSent": 0.031
+  },
+  {
+    "epoch": 97,
+    "networkRecv": 0.321,
+    "networkSent": 0.053
+  },
+  {
+    "epoch": 98,
+    "networkRecv": 0.118,
+    "networkSent": 0.092
+  },
+  {
+    "epoch": 99,
+    "networkRecv": 0.318,
+    "networkSent": 0.041
+  },
+  {
+    "epoch": 100,
+    "networkRecv": 0.671,
+    "networkSent": 0.046
+  },
+  {
+    "epoch": 101,
+    "networkRecv": 0.042,
+    "networkSent": 0.054
+  },
+  {
+    "epoch": 102,
+    "networkRecv": 0.915,
+    "networkSent": 0.05
+  },
+  {
+    "epoch": 103,
+    "networkRecv": 0.04,
+    "networkSent": 0.036
+  },
+  {
+    "epoch": 104,
+    "networkRecv": 0.275,
+    "networkSent": 0.088
+  },
+  {
+    "epoch": 105,
+    "networkRecv": 0.053,
+    "networkSent": 0.08
+  },
+  {
+    "epoch": 106,
+    "networkRecv": 0.932,
+    "networkSent": 0.102
+  },
+  {
+    "epoch": 107,
+    "networkRecv": 0.877,
+    "networkSent": 0.121
+  },
+  {
+    "epoch": 108,
+    "networkRecv": 1.51,
+    "networkSent": 0.139
+  },
+  {
+    "epoch": 109,
+    "networkRecv": 1.126,
+    "networkSent": 0.127
+  },
+  {
+    "epoch": 110,
+    "networkRecv": 1.562,
+    "networkSent": 0.104
+  },
+  {
+    "epoch": 111,
+    "networkRecv": 0.732,
+    "networkSent": 0.116
+  },
+  {
+    "epoch": 112,
+    "networkRecv": 0.69,
+    "networkSent": 0.139
+  },
+  {
+    "epoch": 113,
+    "networkRecv": 0.581,
+    "networkSent": 0.056
+  },
+  {
+    "epoch": 114,
+    "networkRecv": 0.525,
+    "networkSent": 0.098
+  },
+  {
+    "epoch": 115,
+    "networkRecv": 0.857,
+    "networkSent": 0.093
+  },
+  {
+    "epoch": 116,
+    "networkRecv": 1.172,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 117,
+    "networkRecv": 1.626,
+    "networkSent": 0.087
+  },
+  {
+    "epoch": 118,
+    "networkRecv": 1.309,
+    "networkSent": 0.101
+  },
+  {
+    "epoch": 119,
+    "networkRecv": 1.137,
+    "networkSent": 0.086
+  },
+  {
+    "epoch": 120,
+    "networkRecv": 0.853,
+    "networkSent": 0.097
+  },
+  {
+    "epoch": 121,
+    "networkRecv": 1.104,
+    "networkSent": 0.078
+  },
+  {
+    "epoch": 122,
+    "networkRecv": 0.226,
+    "networkSent": 0.127
+  },
+  {
+    "epoch": 123,
+    "networkRecv": 0.241,
+    "networkSent": 0.073
+  },
+  {
+    "epoch": 124,
+    "networkRecv": 0.24,
+    "networkSent": 0.081
+  },
+  {
+    "epoch": 125,
+    "networkRecv": 0.091,
+    "networkSent": 0.068
+  },
+  {
+    "epoch": 126,
+    "networkRecv": 0.047,
+    "networkSent": 0.033
+  },
+  {
+    "epoch": 127,
+    "networkRecv": 0.037,
+    "networkSent": 0.046
+  },
+  {
+    "epoch": 128,
+    "networkRecv": 0.045,
+    "networkSent": 0.053
+  },
+  {
+    "epoch": 129,
+    "networkRecv": 0.287,
+    "networkSent": 0.063
+  },
+  {
+    "epoch": 130,
+    "networkRecv": 0.041,
+    "networkSent": 0.059
+  },
+  {
+    "epoch": 131,
+    "networkRecv": 0.086,
+    "networkSent": 0.1
+  },
+  {
+    "epoch": 132,
+    "networkRecv": 0.09,
+    "networkSent": 0.036
+  },
+  {
+    "epoch": 133,
+    "networkRecv": 0.217,
+    "networkSent": 0.059
+  },
+  {
+    "epoch": 134,
+    "networkRecv": 0.093,
+    "networkSent": 0.113
+  },
+  {
+    "epoch": 135,
+    "networkRecv": 0.048,
+    "networkSent": 0.063
+  },
+  {
+    "epoch": 136,
+    "networkRecv": 0.059,
+    "networkSent": 0.053
+  },
+  {
+    "epoch": 137,
+    "networkRecv": 0.029,
+    "networkSent": 0.031
+  },
+  {
+    "epoch": 138,
+    "networkRecv": 0.035,
+    "networkSent": 0.017
+  },
+  {
+    "epoch": 139,
+    "networkRecv": 0.248,
+    "networkSent": 0.026
+  },
+  {
+    "epoch": 140,
+    "networkRecv": 0.045,
+    "networkSent": 0.025
+  },
+  {
+    "epoch": 141,
+    "networkRecv": 0.041,
+    "networkSent": 0.023
+  },
+  {
+    "epoch": 142,
+    "networkRecv": 0.031,
+    "networkSent": 0.016
+  },
+  {
+    "epoch": 143,
+    "networkRecv": 0.081,
+    "networkSent": 0.024
+  },
+  {
+    "epoch": 144,
+    "networkRecv": 0.052,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 145,
+    "networkRecv": 0.223,
+    "networkSent": 0.043
+  },
+  {
+    "epoch": 146,
+    "networkRecv": 0.05,
+    "networkSent": 0.036
+  },
+  {
+    "epoch": 147,
+    "networkRecv": 0.049,
+    "networkSent": 0.028
+  },
+  {
+    "epoch": 148,
+    "networkRecv": 0.044,
+    "networkSent": 0.047
+  },
+  {
+    "epoch": 149,
+    "networkRecv": 0.12,
+    "networkSent": 0.089
+  },
+  {
+    "epoch": 150,
+    "networkRecv": 0.071,
+    "networkSent": 0.064
+  }
+]
