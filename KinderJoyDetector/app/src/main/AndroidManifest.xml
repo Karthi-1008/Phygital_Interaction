@@ -15,7 +15,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.KinderJoyDetector"
-        android:hardwareAccelerated="true">
+        android:hardwareAccelerated="true"
+        android:extractNativeLibs="true">
 
         <activity
             android:name=".MainActivity"
