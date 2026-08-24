@@ -111,7 +111,7 @@ The application filters low-confidence detections to reduce incorrect results.
 Different ONNX export versions were tested to understand the trade-off between **model size, performance, compatibility, and detection quality**.
 
 <p align="center">
-  <img src="assets/images/model-export-comparison.png" width="900"/>
+  <img src="assets/images/3 versions of model export.png" width="900"/>
 </p>
 
 The goal was not simply to use the smallest model. The model also needed to work reliably with the Android inference pipeline.
@@ -129,7 +129,7 @@ Before training, the dataset was analyzed to better understand the images, annot
 This shows how the training data is distributed between the different toy classes.
 
 <p align="center">
-  <img src="assets/images/class-distribution.png" width="850"/>
+  <img src="assets/images/Class Distribution.png" width="850"/>
 </p>
 
 ---
@@ -139,7 +139,7 @@ This shows how the training data is distributed between the different toy classe
 The dataset contains images with different dimensions and aspect ratios.
 
 <p align="center">
-  <img src="assets/images/image-dimensions.png" width="850"/>
+  <img src="assets/images/Image Dimensions.png" width="850"/>
 </p>
 
 Understanding this is important because the images must eventually be resized to match the AI model input size.
@@ -151,7 +151,7 @@ Understanding this is important because the images must eventually be resized to
 This visualization shows where objects are located throughout the training images.
 
 <p align="center">
-  <img src="assets/images/annotation-locations.png" width="850"/>
+  <img src="assets/images/Annotation Locations.png" width="850"/>
 </p>
 
 This helps understand whether the toys appear mostly in the center or across different areas of the image.
@@ -163,7 +163,7 @@ This helps understand whether the toys appear mostly in the center or across dif
 The following analysis shows the distribution of bounding box sizes in the dataset.
 
 <p align="center">
-  <img src="assets/images/bounding-box-dimensions.png" width="850"/>
+  <img src="assets/images/Bounding Box Dimensions.png" width="850"/>
 </p>
 
 ---
@@ -173,7 +173,7 @@ The following analysis shows the distribution of bounding box sizes in the datas
 This graph shows how many annotated objects are present in each image.
 
 <p align="center">
-  <img src="assets/images/objects-per-image.png" width="850"/>
+  <img src="assets/images/Objects per Image.png" width="850"/>
 </p>
 
 ---
@@ -199,7 +199,7 @@ This provides an overall view of the training and validation metrics across epoc
 Box loss measures how accurately the model learns the position and size of objects.
 
 <p align="center">
-  <img src="assets/images/box-loss.png" width="850"/>
+  <img src="assets/images/box_loss.png" width="850"/>
 </p>
 
 ---
@@ -209,7 +209,7 @@ Box loss measures how accurately the model learns the position and size of objec
 Classification loss measures how well the model learns to distinguish between different toy classes.
 
 <p align="center">
-  <img src="assets/images/cls-loss.png" width="850"/>
+  <img src="assets/images/cls_loss.png" width="850"/>
 </p>
 
 ---
@@ -219,7 +219,7 @@ Classification loss measures how well the model learns to distinguish between di
 Distribution Focal Loss is used by the model to improve bounding box localization.
 
 <p align="center">
-  <img src="assets/images/dfl-loss.png" width="850"/>
+  <img src="assets/images/dfl_loss.png" width="850"/>
 </p>
 
 ---
@@ -235,7 +235,7 @@ The trained model was evaluated using standard object detection metrics.
 This measures detection accuracy using an IoU threshold of 0.50.
 
 <p align="center">
-  <img src="assets/images/map50.png" width="850"/>
+  <img src="assets/images/mAP50(B).png" width="850"/>
 </p>
 
 ---
@@ -245,7 +245,7 @@ This measures detection accuracy using an IoU threshold of 0.50.
 This is a stricter evaluation that measures performance across multiple IoU thresholds.
 
 <p align="center">
-  <img src="assets/images/map50-95.png" width="850"/>
+  <img src="assets/images/mAP50-95(B).png" width="850"/>
 </p>
 
 ---
@@ -255,7 +255,7 @@ This is a stricter evaluation that measures performance across multiple IoU thre
 Precision shows how many detected objects are actually correct.
 
 <p align="center">
-  <img src="assets/images/precision.png" width="850"/>
+  <img src="assets/images/precision(B).png" width="850"/>
 </p>
 
 ---
@@ -265,7 +265,7 @@ Precision shows how many detected objects are actually correct.
 Recall shows how successfully the model detects objects that are actually present.
 
 <p align="center">
-  <img src="assets/images/recall.png" width="850"/>
+  <img src="assets/images/recall(B).png" width="850"/>
 </p>
 
 ---
@@ -292,7 +292,7 @@ Choosing the correct confidence threshold is important for avoiding false detect
 The F1 score helps find a balance between precision and recall.
 
 <p align="center">
-  <img src="assets/images/f1-confidence.png" width="850"/>
+  <img src="assets/images/F1-Confidence Curve.png" width="850"/>
 </p>
 
 ---
@@ -300,7 +300,7 @@ The F1 score helps find a balance between precision and recall.
 ## Precision Curve
 
 <p align="center">
-  <img src="assets/images/precision-confidence.png" width="850"/>
+  <img src="assets/images/Precision-Confidence Curve.png" width="850"/>
 </p>
 
 ---
@@ -308,7 +308,7 @@ The F1 score helps find a balance between precision and recall.
 ## Recall Curve
 
 <p align="center">
-  <img src="assets/images/recall-confidence.png" width="850"/>
+  <img src="assets/images/Recall-Confidence Curve.png" width="850"/>
 </p>
 
 ---
@@ -316,7 +316,7 @@ The F1 score helps find a balance between precision and recall.
 ## Precision–Recall Curve
 
 <p align="center">
-  <img src="assets/images/precision-recall.png" width="850"/>
+  <img src="assets/images/Precision-Recall Curve.png" width="850"/>
 </p>
 
 ---
@@ -326,7 +326,7 @@ The F1 score helps find a balance between precision and recall.
 The confusion matrix shows how well the model distinguishes between the different toy classes.
 
 <p align="center">
-  <img src="assets/images/confusion-matrix.png" width="900"/>
+  <img src="assets/images/confusion matrix.png" width="900"/>
 </p>
 
 ---
@@ -336,7 +336,7 @@ The confusion matrix shows how well the model distinguishes between the differen
 The normalized version makes it easier to compare the detection accuracy of each class.
 
 <p align="center">
-  <img src="assets/images/confusion-matrix-normalized.png" width="900"/>
+  <img src="assets/images/confusion matrix (Normalized).png" width="900"/>
 </p>
 
 ---
