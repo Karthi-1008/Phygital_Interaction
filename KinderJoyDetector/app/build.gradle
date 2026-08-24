@@ -16,13 +16,21 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // Filter to 64-bit ARM (arm64-v8a) architecture to keep APK size < 10MB
+        // minSdk 21 already gets native multi-dex support from the platform,
+        // so the multidex support library isn't needed here (removed below).
+
+        // ONNX Runtime + Filament each ship a separate native .so per ABI.
+        // Shipping all 4 ABIs roughly quadruples that native-lib weight.
+        // arm64-v8a alone covers ~99% of active devices (Android 8+), so
+        // we build for that only. Add "armeabi-v7a" back only if you must
+        // support very old 32-bit devices — it will cost several extra MB.
         ndk {
             abiFilters "arm64-v8a"
         }
 
-        // Keep only English strings to strip unused localization resources
-        resourceConfigurations += ['en']
+        // Strip unused locale strings pulled in transitively by AndroidX
+        // libraries (material, appcompat ship ~70 languages of strings).
+        resConfigs "en"
     }
 
     buildTypes {
@@ -30,10 +38,8 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Sign with debug key for easy testing — replace with your keystore for production
             signingConfig signingConfigs.debug
-            ndk {
-                debugSymbolLevel = 'NONE'
-            }
         }
         debug {
             minifyEnabled false
@@ -53,29 +59,39 @@ android {
         viewBinding true
     }
 
-    // Packaging options to compress native libs and eliminate redundant metadata
+    // Package ONNX model uncompressed (compressing/decompressing a 30MB+
+    // model at load time wastes both APK space savings and startup time)
+    aaptOptions {
+        noCompress "onnx"
+    }
+
+    // ABI splits for smaller APK sizes per architecture
+    splits {
+        abi {
+            enable false  // Set true to generate per-ABI APKs; false for universal APK
+            reset()
+            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+            universalApk true
+        }
+    }
+
+    // Packaging options
     packagingOptions {
+        jniLibs {
+            pickFirsts += ["**/libc++_shared.so"]
+            useLegacyPackaging = false
+        }
         resources {
             excludes += [
-                "META-INF/*.kotlin_module",
-                "META-INF/AL2.0",
-                "META-INF/LGPL2.1",
                 "META-INF/DEPENDENCIES",
-                "META-INF/LICENSE",
-                "META-INF/LICENSE.txt",
-                "META-INF/license.txt",
-                "META-INF/NOTICE",
-                "META-INF/NOTICE.txt",
-                "META-INF/notice.txt",
-                "META-INF/ASL2.0",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/*.kotlin_module",
                 "META-INF/*.version",
+                "**/*.proto",
+                "kotlin/**",
                 "DebugProbesKt.bin"
             ]
-        }
-        jniLibs {
-            // Compress .so libraries inside the APK file to reduce APK file size to <10MB
-            useLegacyPackaging = true
-            pickFirsts += ["**/libc++_shared.so"]
         }
     }
 }
