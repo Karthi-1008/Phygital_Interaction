@@ -111,10 +111,8 @@ The application filters low-confidence detections to reduce incorrect results.
 Different ONNX export versions were tested to understand the trade-off between **model size, performance, compatibility, and detection quality**.
 
 <p align="center">
-  <img src="assets/images/3 versions of model export.png" width="900"/>
+  <img src="assets/images/3%20versions%20of%20model%20export.png" width="900"/>
 </p>
-
-The goal was not simply to use the smallest model. The model also needed to work reliably with the Android inference pipeline.
 
 ---
 
@@ -129,7 +127,37 @@ Before training, the dataset was analyzed to better understand the images, annot
 This shows how the training data is distributed between the different toy classes.
 
 <p align="center">
-  <img src="assets/images/Class Distribution.png" width="850"/>
+  <img src="assets/images/Class%20Distribution.png" width="850"/>
+</p>
+
+---
+
+## Classes
+
+The dataset contains multiple toy classes used for object detection.
+
+<p align="center">
+  <img src="assets/images/classes.png" width="850"/>
+</p>
+
+---
+
+## Top Classes
+
+This visualization shows the most represented classes in the dataset.
+
+<p align="center">
+  <img src="assets/images/Top%20Classes.png" width="850"/>
+</p>
+
+---
+
+## Split Distribution
+
+This shows how the dataset is distributed across the different dataset splits.
+
+<p align="center">
+  <img src="assets/images/Split%20Distribution.png" width="850"/>
 </p>
 
 ---
@@ -139,10 +167,32 @@ This shows how the training data is distributed between the different toy classe
 The dataset contains images with different dimensions and aspect ratios.
 
 <p align="center">
-  <img src="assets/images/Image Dimensions.png" width="850"/>
+  <img src="assets/images/Image%20Dimensions.png" width="850"/>
 </p>
 
-Understanding this is important because the images must eventually be resized to match the AI model input size.
+<p align="center">
+  <img src="assets/images/Image%20Dimensions%202D.png" width="850"/>
+</p>
+
+---
+
+## Image File Size
+
+This visualization shows the distribution of image file sizes.
+
+<p align="center">
+  <img src="assets/images/Image%20File%20Size.png" width="850"/>
+</p>
+
+---
+
+## Image Formats
+
+This shows the image formats used in the dataset.
+
+<p align="center">
+  <img src="assets/images/Image%20Formats.png" width="850"/>
+</p>
 
 ---
 
@@ -151,19 +201,27 @@ Understanding this is important because the images must eventually be resized to
 This visualization shows where objects are located throughout the training images.
 
 <p align="center">
-  <img src="assets/images/Annotation Locations.png" width="850"/>
+  <img src="assets/images/Annotation%20Locations.png" width="850"/>
 </p>
-
-This helps understand whether the toys appear mostly in the center or across different areas of the image.
 
 ---
 
 ## Bounding Box Dimensions
 
-The following analysis shows the distribution of bounding box sizes in the dataset.
+The following analysis shows the distribution of bounding box sizes.
 
 <p align="center">
-  <img src="assets/images/Bounding Box Dimensions.png" width="850"/>
+  <img src="assets/images/Bounding%20Box%20Dimensions.png" width="850"/>
+</p>
+
+---
+
+## Bounding Box Dimensions — Additional Analysis
+
+An additional bounding-box analysis is provided below.
+
+<p align="center">
+  <img src="assets/images/Bounding%20Box%20Dimensions%20%281%29.png" width="850"/>
 </p>
 
 ---
@@ -173,30 +231,20 @@ The following analysis shows the distribution of bounding box sizes in the datas
 This graph shows how many annotated objects are present in each image.
 
 <p align="center">
-  <img src="assets/images/Objects per Image.png" width="850"/>
+  <img src="assets/images/Objects%20per%20Image.png" width="850"/>
 </p>
 
 ---
 
 # 🧠 Training Analysis
 
-The following images show how the model progressed during training.
-
----
-
-## Training Results
-
-<p align="center">
-  <img src="assets/images/results.png" width="900"/>
-</p>
-
-This provides an overall view of the training and validation metrics across epochs.
+The following images show the model training behaviour and optimization process.
 
 ---
 
 ## Box Loss
 
-Box loss measures how accurately the model learns the position and size of objects.
+Box loss measures the model's bounding-box localization error during training.
 
 <p align="center">
   <img src="assets/images/box_loss.png" width="850"/>
@@ -216,7 +264,7 @@ Classification loss measures how well the model learns to distinguish between di
 
 ## DFL Loss
 
-Distribution Focal Loss is used by the model to improve bounding box localization.
+Distribution Focal Loss helps improve bounding-box localization.
 
 <p align="center">
   <img src="assets/images/dfl_loss.png" width="850"/>
@@ -224,28 +272,38 @@ Distribution Focal Loss is used by the model to improve bounding box localizatio
 
 ---
 
+## Learning Rate
+
+The learning-rate progression during training is shown below.
+
+<p align="center">
+  <img src="assets/images/lr.png" width="850"/>
+</p>
+
+---
+
 # 📈 Model Performance
 
-The trained model was evaluated using standard object detection metrics.
+The trained model was evaluated using standard object-detection metrics.
 
 ---
 
 ## mAP@50
 
-This measures detection accuracy using an IoU threshold of 0.50.
+This measures detection accuracy at an IoU threshold of 0.50.
 
 <p align="center">
-  <img src="assets/images/mAP50(B).png" width="850"/>
+  <img src="assets/images/mAP50%28B%29.png" width="850"/>
 </p>
 
 ---
 
 ## mAP@50–95
 
-This is a stricter evaluation that measures performance across multiple IoU thresholds.
+This is a stricter evaluation across multiple IoU thresholds.
 
 <p align="center">
-  <img src="assets/images/mAP50-95(B).png" width="850"/>
+  <img src="assets/images/mAP50-95%28B%29.png" width="850"/>
 </p>
 
 ---
@@ -255,7 +313,7 @@ This is a stricter evaluation that measures performance across multiple IoU thre
 Precision shows how many detected objects are actually correct.
 
 <p align="center">
-  <img src="assets/images/precision(B).png" width="850"/>
+  <img src="assets/images/precision%28B%29.png" width="850"/>
 </p>
 
 ---
@@ -265,7 +323,7 @@ Precision shows how many detected objects are actually correct.
 Recall shows how successfully the model detects objects that are actually present.
 
 <p align="center">
-  <img src="assets/images/recall(B).png" width="850"/>
+  <img src="assets/images/recall%28B%29.png" width="850"/>
 </p>
 
 ---
@@ -276,47 +334,53 @@ Every prediction produced by the AI model has a confidence score.
 
 For example:
 
-```text id="x6j5rd"
+```text
 0.95 → Very confident
 0.80 → Strong detection
 0.60 → Possible detection
 0.30 → Low confidence
-```
+````
 
 Choosing the correct confidence threshold is important for avoiding false detections while still detecting the toy reliably.
 
 ---
 
-## F1 Curve
+## F1-Confidence Curve
 
-The F1 score helps find a balance between precision and recall.
+The F1 score helps find a balance between precision and recall at different confidence thresholds.
 
 <p align="center">
-  <img src="assets/images/F1-Confidence Curve.png" width="850"/>
+  <img src="assets/images/F1-Confidence%20Curve.png" width="850"/>
 </p>
 
 ---
 
-## Precision Curve
+## Precision-Confidence Curve
+
+This shows how precision changes with different confidence thresholds.
 
 <p align="center">
-  <img src="assets/images/Precision-Confidence Curve.png" width="850"/>
+  <img src="assets/images/Precision-Confidence%20Curve.png" width="850"/>
 </p>
 
 ---
 
-## Recall Curve
+## Recall-Confidence Curve
+
+This shows how recall changes with different confidence thresholds.
 
 <p align="center">
-  <img src="assets/images/Recall-Confidence Curve.png" width="850"/>
+  <img src="assets/images/Recall-Confidence%20Curve.png" width="850"/>
 </p>
 
 ---
 
 ## Precision–Recall Curve
 
+This shows the relationship between precision and recall across different confidence levels.
+
 <p align="center">
-  <img src="assets/images/Precision-Recall Curve.png" width="850"/>
+  <img src="assets/images/Precision-Recall%20Curve.png" width="850"/>
 </p>
 
 ---
@@ -326,7 +390,7 @@ The F1 score helps find a balance between precision and recall.
 The confusion matrix shows how well the model distinguishes between the different toy classes.
 
 <p align="center">
-  <img src="assets/images/confusion matrix.png" width="900"/>
+  <img src="assets/images/confusion%20matrix.png" width="900"/>
 </p>
 
 ---
@@ -336,50 +400,71 @@ The confusion matrix shows how well the model distinguishes between the differen
 The normalized version makes it easier to compare the detection accuracy of each class.
 
 <p align="center">
-  <img src="assets/images/confusion matrix (Normalized).png" width="900"/>
+  <img src="assets/images/confusion%20matrix%20%28Normalized%29.png" width="900"/>
 </p>
 
 ---
 
-# 🖼️ Prediction Examples
+# 💻 System Performance
 
-The following examples show how the trained model performs on validation images.
+The following images show resource usage and system behaviour during the experiment.
 
-## Prediction Results
+---
 
-<p align="center">
-  <img src="assets/images/val-batch0-pred.jpg" width="850"/>
-</p>
+## CPU & RAM Usage
 
 <p align="center">
-  <img src="assets/images/val-batch1-pred.jpg" width="850"/>
-</p>
-
-<p align="center">
-  <img src="assets/images/val-batch2-pred.jpg" width="850"/>
+  <img src="assets/images/CPU%20%26%20RAM%20Usage.png" width="850"/>
 </p>
 
 ---
 
-# 📌 Ground Truth Examples
-
-These images show the original annotations used for comparison.
+## GPU Utilization & Memory
 
 <p align="center">
-  <img src="assets/images/val-batch0-label.jpg" width="850"/>
+  <img src="assets/images/GPU%20Utilization%20%26%20Memory.png" width="850"/>
 </p>
-
-<p align="center">
-  <img src="assets/images/val-batch1-label.jpg" width="850"/>
-</p>
-
-<p align="center">
-  <img src="assets/images/val-batch2-label.jpg" width="850"/>
-</p>
-
-Comparing the ground truth and prediction images helps visually verify how accurately the model detects each toy.
 
 ---
+
+## GPU Temperature
+
+<p align="center">
+  <img src="assets/images/GPU%20Temperature.png" width="850"/>
+</p>
+
+---
+
+## Disk I/O
+
+<p align="center">
+  <img src="assets/images/Disk%20I_O.png" width="850"/>
+</p>
+
+---
+
+## Network I/O
+
+<p align="center">
+  <img src="assets/images/Network%20I_O.png" width="850"/>
+</p>
+
+---
+
+## Run Information
+
+<p align="center">
+  <img src="assets/images/Run%20Information.png" width="850"/>
+</p>
+
+---
+
+## System Information
+
+<p align="center">
+  <img src="assets/images/system.png" width="850"/>
+</p>
+```
 
 # 📐 Handling Camera and Model Coordinates
 
