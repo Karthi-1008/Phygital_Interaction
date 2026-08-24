@@ -204,106 +204,44 @@ class YoloDetector(private val context: Context) {
         val inv255 = 1f / 255f
 
         // 2. Ultra-fast pixel extraction with rotation into pre-allocated inputBuffer
-        //    Outer branch hoisting eliminates 400,000+ conditional checks per frame.
-        when (angle) {
-            0 -> {
-                for (y in 0 until INPUT_SIZE) {
-                    val srcY = y - padTop
-                    val rowIsPad = srcY < 0 || srcY >= newH
-                    val ry = if (rowIsPad) 0 else (srcY * rotH / newH).coerceIn(0, rotH - 1)
-                    val rowBase = y * INPUT_SIZE
-                    val syBase = ry * cropW
-                    for (x in 0 until INPUT_SIZE) {
-                        val srcX = x - padLeft
-                        val idx = rowBase + x
-                        if (rowIsPad || srcX < 0 || srcX >= newW) {
-                            inputBuffer[rOff + idx] = padVal
-                            inputBuffer[gOff + idx] = padVal
-                            inputBuffer[bOff + idx] = padVal
-                        } else {
-                            val rx = (srcX * rotW / newW).coerceIn(0, rotW - 1)
-                            val px = srcPixels[syBase + rx]
-                            inputBuffer[rOff + idx] = ((px shr 16) and 0xFF) * inv255
-                            inputBuffer[gOff + idx] = ((px shr  8) and 0xFF) * inv255
-                            inputBuffer[bOff + idx] = ( px         and 0xFF) * inv255
+        for (y in 0 until INPUT_SIZE) {
+            val srcY = y - padTop
+            val rowIsPad = srcY < 0 || srcY >= newH
+            val ry = if (rowIsPad) 0 else (srcY * rotH / newH).coerceIn(0, rotH - 1)
+            val rowBase = y * INPUT_SIZE
+            for (x in 0 until INPUT_SIZE) {
+                val srcX = x - padLeft
+                val idx = rowBase + x
+                if (rowIsPad || srcX < 0 || srcX >= newW) {
+                    inputBuffer[rOff + idx] = padVal
+                    inputBuffer[gOff + idx] = padVal
+                    inputBuffer[bOff + idx] = padVal
+                } else {
+                    val rx = (srcX * rotW / newW).coerceIn(0, rotW - 1)
+                    val sx: Int
+                    val sy: Int
+                    when (angle) {
+                        90 -> {
+                            sx = ry.coerceIn(0, cropW - 1)
+                            sy = (cropH - 1 - rx).coerceIn(0, cropH - 1)
+                        }
+                        180 -> {
+                            sx = (cropW - 1 - rx).coerceIn(0, cropW - 1)
+                            sy = (cropH - 1 - ry).coerceIn(0, cropH - 1)
+                        }
+                        270 -> {
+                            sx = (cropW - 1 - ry).coerceIn(0, cropW - 1)
+                            sy = rx.coerceIn(0, cropH - 1)
+                        }
+                        else -> {
+                            sx = rx.coerceIn(0, cropW - 1)
+                            sy = ry.coerceIn(0, cropH - 1)
                         }
                     }
-                }
-            }
-            90 -> { // 90° CW: sx = ry, sy = cropH - 1 - rx
-                for (y in 0 until INPUT_SIZE) {
-                    val srcY = y - padTop
-                    val rowIsPad = srcY < 0 || srcY >= newH
-                    val ry = if (rowIsPad) 0 else (srcY * rotH / newH).coerceIn(0, rotH - 1)
-                    val rowBase = y * INPUT_SIZE
-                    val sx = ry.coerceIn(0, cropW - 1)
-                    for (x in 0 until INPUT_SIZE) {
-                        val srcX = x - padLeft
-                        val idx = rowBase + x
-                        if (rowIsPad || srcX < 0 || srcX >= newW) {
-                            inputBuffer[rOff + idx] = padVal
-                            inputBuffer[gOff + idx] = padVal
-                            inputBuffer[bOff + idx] = padVal
-                        } else {
-                            val rx = (srcX * rotW / newW).coerceIn(0, rotW - 1)
-                            val sy = (cropH - 1 - rx).coerceIn(0, cropH - 1)
-                            val px = srcPixels[sy * cropW + sx]
-                            inputBuffer[rOff + idx] = ((px shr 16) and 0xFF) * inv255
-                            inputBuffer[gOff + idx] = ((px shr  8) and 0xFF) * inv255
-                            inputBuffer[bOff + idx] = ( px         and 0xFF) * inv255
-                        }
-                    }
-                }
-            }
-            180 -> { // 180°: sx = cropW - 1 - rx, sy = cropH - 1 - ry
-                for (y in 0 until INPUT_SIZE) {
-                    val srcY = y - padTop
-                    val rowIsPad = srcY < 0 || srcY >= newH
-                    val ry = if (rowIsPad) 0 else (srcY * rotH / newH).coerceIn(0, rotH - 1)
-                    val rowBase = y * INPUT_SIZE
-                    val sy = (cropH - 1 - ry).coerceIn(0, cropH - 1)
-                    val syBase = sy * cropW
-                    for (x in 0 until INPUT_SIZE) {
-                        val srcX = x - padLeft
-                        val idx = rowBase + x
-                        if (rowIsPad || srcX < 0 || srcX >= newW) {
-                            inputBuffer[rOff + idx] = padVal
-                            inputBuffer[gOff + idx] = padVal
-                            inputBuffer[bOff + idx] = padVal
-                        } else {
-                            val rx = (srcX * rotW / newW).coerceIn(0, rotW - 1)
-                            val sx = (cropW - 1 - rx).coerceIn(0, cropW - 1)
-                            val px = srcPixels[syBase + sx]
-                            inputBuffer[rOff + idx] = ((px shr 16) and 0xFF) * inv255
-                            inputBuffer[gOff + idx] = ((px shr  8) and 0xFF) * inv255
-                            inputBuffer[bOff + idx] = ( px         and 0xFF) * inv255
-                        }
-                    }
-                }
-            }
-            270 -> { // 270° CW: sx = cropW - 1 - ry, sy = rx
-                for (y in 0 until INPUT_SIZE) {
-                    val srcY = y - padTop
-                    val rowIsPad = srcY < 0 || srcY >= newH
-                    val ry = if (rowIsPad) 0 else (srcY * rotH / newH).coerceIn(0, rotH - 1)
-                    val rowBase = y * INPUT_SIZE
-                    val sx = (cropW - 1 - ry).coerceIn(0, cropW - 1)
-                    for (x in 0 until INPUT_SIZE) {
-                        val srcX = x - padLeft
-                        val idx = rowBase + x
-                        if (rowIsPad || srcX < 0 || srcX >= newW) {
-                            inputBuffer[rOff + idx] = padVal
-                            inputBuffer[gOff + idx] = padVal
-                            inputBuffer[bOff + idx] = padVal
-                        } else {
-                            val rx = (srcX * rotW / newW).coerceIn(0, rotW - 1)
-                            val sy = rx.coerceIn(0, cropH - 1)
-                            val px = srcPixels[sy * cropW + sx]
-                            inputBuffer[rOff + idx] = ((px shr 16) and 0xFF) * inv255
-                            inputBuffer[gOff + idx] = ((px shr  8) and 0xFF) * inv255
-                            inputBuffer[bOff + idx] = ( px         and 0xFF) * inv255
-                        }
-                    }
+                    val px = srcPixels[sy * cropW + sx]
+                    inputBuffer[rOff + idx] = ((px shr 16) and 0xFF) * inv255
+                    inputBuffer[gOff + idx] = ((px shr 8) and 0xFF) * inv255
+                    inputBuffer[bOff + idx] = (px and 0xFF) * inv255
                 }
             }
         }

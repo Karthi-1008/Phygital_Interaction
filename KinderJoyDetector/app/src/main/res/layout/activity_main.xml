@@ -59,17 +59,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- ══════════════════ Result overlay banner (non-blocking, camera + AR model remain visible) ══════════════════ -->
+    <!-- ══════════════════ Result screen (shown on detection completion) ══════════════════ -->
     <LinearLayout
         android:id="@+id/resultContainer"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="#DD0F0A1F"
-        android:paddingVertical="16dp"
-        android:paddingHorizontal="20dp"
+        android:background="#0F0A1F"
         android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -78,22 +77,22 @@
             android:id="@+id/resultTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingVertical="8dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="28dp"
             android:paddingHorizontal="16dp"
             android:text="Detection Result"
             android:textAlignment="center"
             android:textColor="#FFFFFF"
-            android:textSize="24sp"
+            android:textSize="28sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnScanAgain"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:paddingHorizontal="32dp"
+            android:layout_margin="20dp"
             android:text="Scan Again"
-            android:textSize="15sp"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
     </LinearLayout>

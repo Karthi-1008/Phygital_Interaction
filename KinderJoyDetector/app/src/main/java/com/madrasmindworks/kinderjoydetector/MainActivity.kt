@@ -15,26 +15,18 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.madrasmindworks.kinderjoydetector.databinding.ActivityMainBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-/**
- * Detection-only build: camera -> YOLO detector -> guide box + progress ring
- * (OverlayView) -> name shown in status text / result banner once confirmed.
- * No 3D/AR rendering — Filament and GLB assets have been removed entirely.
- */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var detector: YoloDetector
     private lateinit var inferenceExecutor: ExecutorService
     private lateinit var cameraProvider: ProcessCameraProvider
-
-    private var lockedClassIndex = -1
 
     // Frame skip — never pile up work
     @Volatile private var isProcessing = false
@@ -50,7 +42,7 @@ class MainActivity : AppCompatActivity() {
     // frame comes back empty/borderline, so the box doesn't flicker.
     private var lastDets: List<YoloDetector.Detection> = emptyList()
     private var framesSinceLastDet = 0
-    private val HOLD_FRAMES = 6
+    private val HOLD_FRAMES = 4
 
     // Multi-frame temporal stability tracking & 60% confidence confirmation
     private var candidateClassIndex = -1
@@ -67,7 +59,8 @@ class MainActivity : AppCompatActivity() {
     private val PROGRESS_STEP = 0.055f   // ~ fills in well under 2s at typical FPS
     private val PROGRESS_DECAY = 0.09f
 
-    // Locks the result once confirmed (until "Scan Again").
+    // Once true, all further frame processing / camera analysis stops until
+    // the user taps "Scan Again". Nothing runs in the background meanwhile.
     @Volatile private var detectionLocked = false
 
     companion object {
@@ -125,7 +118,6 @@ class MainActivity : AppCompatActivity() {
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
-                Log.i(TAG, "Camera Ready: Size(360, 480)")
             } catch (e: Exception) {
                 Log.e(TAG, "Camera bind failed", e)
             }
@@ -147,13 +139,12 @@ class MainActivity : AppCompatActivity() {
         val top  = (frameH - size) / 2f
         guideBoxFrame = RectF(left, top, left + size, top + size)
         guideBoxRect = Rect(left.toInt(), top.toInt(), (left + size).toInt(), (top + size).toInt())
-        Log.d(TAG, "Guide box initialized: frameSize=(${frameW}x${frameH}), boxRect=${guideBoxRect}")
     }
 
     // ── Frame processing ──────────────────────────────────────────────────────
 
     private fun processFrame(image: ImageProxy) {
-        if (isProcessing) { image.close(); return }
+        if (isProcessing || detectionLocked) { image.close(); return }
         isProcessing = true
 
         val bmp = imageProxyToBitmap(image)
@@ -185,71 +176,60 @@ class MainActivity : AppCompatActivity() {
         val confirmedDet: YoloDetector.Detection?
         val isConfirmed: Boolean
 
-        if (!detectionLocked) {
-            if (highConfInBoxDets.isNotEmpty()) {
-                val topDet = highConfInBoxDets.maxByOrNull { it.confidence }!!
-                if (topDet.classIndex == candidateClassIndex) {
-                    candidateFrameCount++
-                } else {
-                    candidateClassIndex = topDet.classIndex
-                    candidateFrameCount = 1
-                }
-                attemptFrameCount++
-
-                // Rule: 60%+ confidence for 3 continuous frames -> CONFIRM TOY
-                if (candidateFrameCount >= REQUIRED_STABLE_FRAMES) {
-                    confirmedDet = topDet
-                    isConfirmed = true
-                    lockedClassIndex = topDet.classIndex
-                    Log.i(TAG, "Detection Confirmed (3 stable frames): class=${topDet.classIndex} (${topDet.className}), conf=${"%.1f".format(topDet.confidence * 100)}%")
-                } else {
-                    confirmedDet = null
-                    isConfirmed = false
-                    lastDets = highConfInBoxDets
-                    framesSinceLastDet = 0
-                }
+        if (highConfInBoxDets.isNotEmpty()) {
+            val topDet = highConfInBoxDets.maxByOrNull { it.confidence }!!
+            if (topDet.classIndex == candidateClassIndex) {
+                candidateFrameCount++
             } else {
-                val hasObjectInBox = rawDets.any { calculateCoverage(it.rect, boxF) >= 0.20f }
-                if (hasObjectInBox) {
-                    attemptFrameCount++
-                } else {
-                    attemptFrameCount = (attemptFrameCount - 1).coerceAtLeast(0)
-                }
+                candidateClassIndex = topDet.classIndex
+                candidateFrameCount = 1
+            }
+            attemptFrameCount++
 
-                candidateClassIndex = -1
-                candidateFrameCount = 0
-
-                if (attemptFrameCount >= UNKNOWN_TIMEOUT_FRAMES) {
-                    confirmedDet = YoloDetector.Detection(
-                        rect = boxF,
-                        classIndex = -1,
-                        className = "Unknown",
-                        confidence = 0f
-                    )
-                    isConfirmed = true
-                    lockedClassIndex = -1
-                    Log.i(TAG, "Detection Confirmed: Unknown object (timeout)")
-                } else {
-                    confirmedDet = null
-                    isConfirmed = false
-                    if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
-                        framesSinceLastDet++
-                    } else {
-                        lastDets = emptyList()
-                    }
-                }
+            // Rule: 60%+ confidence for 3 continuous frames -> CONFIRM TOY (no more scanning/checks!)
+            if (candidateFrameCount >= REQUIRED_STABLE_FRAMES) {
+                confirmedDet = topDet
+                isConfirmed = true
+            } else {
+                confirmedDet = null
+                isConfirmed = false
+                lastDets = highConfInBoxDets
+                framesSinceLastDet = 0
             }
         } else {
-            // Result is locked — no further class changes until "Scan Again".
-            confirmedDet = null
-            isConfirmed = false
+            // Check if ANY object is held inside the guide box (even low confidence or un-recognized)
+            val hasObjectInBox = rawDets.any { calculateCoverage(it.rect, boxF) >= 0.20f }
+            if (hasObjectInBox) {
+                attemptFrameCount++
+            } else {
+                attemptFrameCount = (attemptFrameCount - 1).coerceAtLeast(0)
+            }
+
+            candidateClassIndex = -1
+            candidateFrameCount = 0
+
+            // Else Condition: If an object is held in the box but fails to reach 60% confidence x 3 continuous frames -> Confirm Unknown!
+            if (attemptFrameCount >= UNKNOWN_TIMEOUT_FRAMES) {
+                confirmedDet = YoloDetector.Detection(
+                    rect = boxF,
+                    classIndex = -1,
+                    className = "Unknown",
+                    confidence = 0f
+                )
+                isConfirmed = true
+            } else {
+                confirmedDet = null
+                isConfirmed = false
+                if (framesSinceLastDet < HOLD_FRAMES && lastDets.isNotEmpty()) {
+                    framesSinceLastDet++
+                } else {
+                    lastDets = emptyList()
+                }
+            }
         }
 
-        val liveDets = rawDets.filter { it.classIndex >= 0 && calculateCoverage(it.rect, boxF) >= 0.20f }
-        val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (liveDets.isNotEmpty()) liveDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList()))
-
         if (isConfirmed && confirmedDet != null) {
-            detectionLocked = true   // Lock result until user taps "Scan Again"
+            detectionLocked = true   // Stop scanning permanently until user resets
             progress = 1.0f
 
             runOnUiThread {
@@ -258,7 +238,8 @@ class MainActivity : AppCompatActivity() {
                 updateStatus(if (confirmedDet.classIndex >= 0) listOf(confirmedDet) else emptyList())
                 showDetectionResult(confirmedDet)
             }
-        } else if (!detectionLocked) {
+        } else {
+            val activeDets = if (highConfInBoxDets.isNotEmpty()) highConfInBoxDets else (if (framesSinceLastDet < HOLD_FRAMES) lastDets else emptyList())
             if (activeDets.isNotEmpty()) progress += PROGRESS_STEP else progress -= PROGRESS_DECAY
             progress = progress.coerceIn(0f, 1f)
 
@@ -273,7 +254,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Coverage calculation = IntersectionArea(prediction, guideBox) / PredictionArea
+     * Goal 2: Coverage calculation = IntersectionArea(prediction, guideBox) / PredictionArea
      */
     private fun calculateCoverage(pred: RectF, guideBox: RectF): Float {
         val ix1 = maxOf(pred.left, guideBox.left)
@@ -315,7 +296,7 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = when {
             dets.isEmpty() -> "Hold a toy inside the box"
             dets[0].classIndex < 0 -> "Unknown object"
-            else -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}%"
+            else -> "${dets[0].className}  ${"%.0f".format(dets[0].confidence * 100)}% — hold steady…"
         }
         binding.statusText.setTextColor(if (dets.isEmpty()) Color.LTGRAY else Color.WHITE)
     }
@@ -323,21 +304,22 @@ class MainActivity : AppCompatActivity() {
     // ── Detection Result Display ──────────────────────────────────────────────
 
     private fun showDetectionResult(det: YoloDetector.Detection) {
-        // Floating bottom banner showing just the detected name.
+        stopCamera()   // Stop camera and analyzer immediately
+
+        binding.previewView.visibility = View.GONE
+        binding.overlayView.visibility = View.GONE
+        binding.statusText.visibility = View.GONE
         binding.resultContainer.visibility = View.VISIBLE
 
         if (det.classIndex < 0 || det.className == "Unknown") {
-            binding.resultTitle.text = "Unknown Object"
+            binding.resultTitle.text = "Unknown"
         } else {
-            binding.resultTitle.text = "${det.className} Confirmed!"
+            binding.resultTitle.text = det.className
         }
     }
 
-    /** "Scan Again" — unlocks detection and resets for a new scan. */
+    /** "Scan Again" — tears down the result screen and resumes live detection. */
     private fun resetForNewScan() {
-        Log.d(TAG, "Resetting for new scan...")
-        lockedClassIndex = -1
-
         binding.resultContainer.visibility = View.GONE
         binding.previewView.visibility = View.VISIBLE
         binding.overlayView.visibility = View.VISIBLE
@@ -352,6 +334,8 @@ class MainActivity : AppCompatActivity() {
         detectionLocked = false
         binding.overlayView.setProgress(0f, false)
         binding.statusText.text = "Point camera at a toy — hold it in the box"
+
+        startCamera()
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
@@ -373,7 +357,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopCamera()
         inferenceExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
         reusableBitmap?.recycle()
