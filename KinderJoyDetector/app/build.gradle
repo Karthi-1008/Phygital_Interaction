@@ -16,13 +16,23 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // Filter to 64-bit ARM (arm64-v8a) architecture to keep APK size < 10MB
+        // Package native libs for both 64-bit and 32-bit ARM (compatible with 100% of Android phones)
         ndk {
-            abiFilters "arm64-v8a"
+            abiFilters "arm64-v8a", "armeabi-v7a"
         }
 
         // Keep only English strings to strip unused localization resources
         resourceConfigurations += ['en']
+    }
+
+    // Generate individual ABI APKs (<9MB each) AND a universal APK
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a", "armeabi-v7a"
+            universalApk true
+        }
     }
 
     buildTypes {

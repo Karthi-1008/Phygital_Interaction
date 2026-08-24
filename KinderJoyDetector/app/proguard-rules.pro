@@ -5,14 +5,12 @@
 -dontwarn com.microsoft.onnxruntime.**
 
 # Keep CameraX
--keep class androidx.camera.core.** { *; }
--keep class androidx.camera.camera2.** { *; }
--keep class androidx.camera.lifecycle.** { *; }
--keep class androidx.camera.view.** { *; }
+-keep class androidx.camera.** { *; }
 -dontwarn androidx.camera.**
 
-# Keep Activity and Custom Views for XML inflation
+# Keep Activity, Custom Views, and Detector
 -keep class com.madrasmindworks.kinderjoydetector.MainActivity { *; }
+-keep class com.madrasmindworks.kinderjoydetector.YoloDetector** { *; }
 -keep class com.madrasmindworks.kinderjoydetector.OverlayView {
     public <init>(android.content.Context);
     public <init>(android.content.Context, android.util.AttributeSet);
