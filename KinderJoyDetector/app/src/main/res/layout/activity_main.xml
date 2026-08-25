@@ -34,7 +34,7 @@
         android:background="#BB000000"
         android:paddingVertical="10dp"
         android:paddingHorizontal="16dp"
-        android:text="🎯 Kinder Joy Detector"
+        android:text="🎯 Phygital Interaction"
         android:textColor="#FFFFFF"
         android:textSize="15sp"
         android:textStyle="bold"

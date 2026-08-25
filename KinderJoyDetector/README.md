@@ -1,4 +1,4 @@
-# 🎯 Kinder Joy Detector — Android App
+# 🎯 Phygital Interaction — Android App
 
 Real-time YOLO11n toy detector using ONNX Runtime + CameraX.
 
