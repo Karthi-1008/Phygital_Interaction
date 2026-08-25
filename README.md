@@ -1,5 +1,9 @@
 # Phygital Interaction
 
+<p align="center">
+  <img src="./assets/images/logo.png" alt="Phygital Interaction - Kinder Joy Detection" width="100%">
+</p>
+
 An Android application that uses **AI-powered object detection** to identify Kinder Joy toys in real time through a smartphone camera.
 
 The project focuses on building a reliable on-device detection system using a custom-trained YOLO model and ONNX Runtime.
