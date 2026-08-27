@@ -651,6 +651,11 @@ This project combines **computer vision, mobile development, artificial intellig
 
 [Phygital Interaction on GitHub](https://github.com/Karthi-1008/Phygital_Interaction.git)
 
+Also On Hugging Face and Kaggle for Dataset
+
+[karthi1008/Phygital_Interaction](https://huggingface.co/datasets/karthi1008/Phygital_Interaction)
+
+https://www.kaggle.com/datasets/karthikeyan100/kinder-joy-toys
 ---
 
 ## 👨‍💻 Author
